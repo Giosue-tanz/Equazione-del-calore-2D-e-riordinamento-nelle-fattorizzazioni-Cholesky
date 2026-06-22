@@ -266,8 +266,9 @@ discretizzazione uniforme del dominio $[0,1]^2$ in una griglia $(N+2)\times(N+2)
 \textbf{Output.} Due file di testo:
 \begin{itemize}
   \item \texttt{coords.txt} — una riga per ogni nodo interno nella forma\\
-        \texttt{id\quad x\quad y},\quad con \texttt{id} $\in\{0,\dots,N^2-1\}$
-        e coordinate $x_i = i/(N+1)$, $y_j = j/(N+1)$;
+        \texttt{n\quad i\quad j\quad x\quad y},\quad con \texttt{n} $\in\{0,\dots,N^2-1\}$
+        (identificatore), indici di griglia \texttt{i, j} $\in\{1,\dots,N\}$ e coordinate $x_i = i/(N+1)$, $y_j = j/(N+1)$
+        (utili nel Modulo 2 per calcolare il separatore geometrico senza ridedurli);
   \item \texttt{connectivity.txt} — una riga per ogni arco \texttt{u\quad v}
         del grafo di adiacenza, con $\texttt{u} < \texttt{v}$, elencando tutte le
         coppie di nodi interni collegati orizzontalmente o verticalmente.
@@ -287,7 +288,7 @@ discretizzazione uniforme del dominio $[0,1]^2$ in una griglia $(N+2)\times(N+2)
   \item Array bidimensionale (o mappa) \texttt{id[i][j]} per la conversione
         da indici di griglia $(i,j)$ a identificatore di nodo.
   \item Lista di adiacenza \texttt{std::vector<std::vector<int>>} di dimensione $N^2$
-        per memorizzare i vicini di ciascun nodo.
+        per memorizzare i vicini di ciascun nodo (si raccomanda l'uso di \texttt{std::vector::reserve()} per pre-allocare memoria ed evitare riallocazioni, specialmente per $N$ grandi).
 \end{itemize}
 
 \textbf{Complessità attesa.} Generazione e scrittura in tempo $O(N^2)$: ogni nodo
@@ -364,8 +365,10 @@ usato dal Modulo 3.
   \item Calcolo del passo $h = 1/(N+1)$ e del coefficiente $\kappa = 0.01$.
   \item Per ogni nodo interno $k$ (nel nuovo ordinamento): inserimento dell'entrata
         diagonale $A[k,k] = -4\kappa/h^2$ e delle entrate fuori diagonale
-        $A[k,k']=+\kappa/h^2$ per ogni vicino $k'$; i vicini di bordo contribuiscono
-        solo al termine noto.
+        $A[k,k']=+\kappa/h^2$ per ogni vicino $k'$; se un vicino $k'$ cade sul bordo,
+        l'entrata corrispondente sparirà dalla matrice e il suo valore ($u_0 = 0$) andrà
+        portato al secondo membro $b_k$. Anche se l'effetto numerico è nullo, la logica deve
+        essere robusta per condizioni non omogenee.
   \item Valutazione del termine sorgente: $b_k = -f(x_{i(k)}, y_{j(k)})$ con
         $f(x,y) = e^{-10(x^2+y^2)}$.
   \item Applicazione della permutazione (se richiesta) per tradurre gli indici dal
@@ -377,8 +380,10 @@ compare due volte in \texttt{A.txt} con lo stesso valore.
 
 \textbf{Strutture dati.}
 \begin{itemize}
-  \item Array \texttt{perm[]} per la permutazione; \texttt{inv\_perm[]} per l'inversa.
-  \item Tripli \texttt{(i,j,val)} accumulati in un \texttt{std::vector} prima della scrittura.
+  \item Array \texttt{perm[]} per la permutazione; \texttt{inv\_perm[]} per l'inversa
+        (\texttt{inv\_perm[old\_id] = new\_id}), fondamentale per mappare l'ordinamento in tempo $O(N^2)$.
+  \item Tripli \texttt{(i,j,val)} accumulati in un \texttt{std::vector} prima della scrittura
+        (anche qui, usare \texttt{reserve()} conoscendo la numerosità attesa).
 \end{itemize}
 
 \textbf{Complessità attesa.} Assemblaggio in $O(N^2)$ (al più 5 entrate per nodo);
@@ -408,7 +413,8 @@ produce i file letti dal Modulo 4.
 
 \textbf{Funzionalità richieste.}
 \begin{itemize}
-  \item Lettura dei file e costruzione di \texttt{scipy.sparse.csc\_matrix}.
+  \item Lettura dei file e costruzione di \texttt{scipy.sparse.csc\_matrix} (o \texttt{coo\_matrix}),
+        che gestiscono automaticamente la somma delle entrate duplicate dovute alla simmetria del file \texttt{A.txt}.
   \item Fattorizzazione $-A = LL^T$ tramite \texttt{sksparse.cholmod.cholesky}
         con \texttt{order="natural"} (l'ordinamento è già codificato in $A$).
   \item Soluzione del sistema lineare tramite \texttt{scipy.sparse.linalg.spsolve\_triangular}.
@@ -460,7 +466,9 @@ Il notebook produrrà:
         per evidenziare visivamente la differenza di fill-in.
   \item Heatmap 2D o superficie 3D della soluzione $u(x,y)$ per almeno un valore di $N$.
   \item Grafico log-log di \texttt{nnz(L)} in funzione di $N$: le due curve dovrebbero
-        separare nettamente attorno a $N \ge 64$.
+        separare nettamente attorno a $N \ge 64$. Verrà esplicitamente calcolato anche il
+        rapporto $\text{nnz}(L_{\text{natural}}) / \text{nnz}(L_{\text{ND}})$ (fill-in relativo) per
+        evidenziare il risparmio di memoria.
   \item Grafico dei tempi di fattorizzazione in funzione di $N$, con indicazione della
         pendenza empirica per stimare l'esponente di crescita.
 \end{enumerate}
