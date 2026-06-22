@@ -247,7 +247,223 @@ Ogni modulo ha un ruolo preciso all'interno della pipeline:
 
 \bigskip
 
-Le strutture dati fondamentali sono: liste di adiacenza (\texttt{std::vector<std::vector<int>>}) per il grafo nei moduli C++, e matrici sparse in formato CSC (\texttt{scipy.sparse.csc\_matrix}) nel modulo Python. Questo schema iniziale verrà progressivamente arricchito con la specifica di input, output, invarianti e complessità di ciascun modulo, man mano che il codice viene sviluppato.
+Le strutture dati fondamentali sono: liste di adiacenza (\texttt{std::vector<std::vector<int>>}) per il grafo nei moduli C++, e matrici sparse in formato CSC (\texttt{scipy.sparse.csc\_matrix}) nel modulo Python.
+
+% ------------------------------------------------------------
+\section{Specifica dei moduli}
+% ------------------------------------------------------------
+
+I quattro moduli vengono di seguito descritti con livello di dettaglio crescente:
+per ciascuno si indicano input, output, funzionalità richieste, strutture dati e
+complessità attesa.
+
+% ---- Modulo 1 -----------------------------------------------
+\subsection*{Modulo 1 — \texttt{task1\_grid.cpp}: generazione della griglia e del grafo}
+
+\textbf{Input.} Intero $N \ge 1$ passato da riga di comando, che determina la
+discretizzazione uniforme del dominio $[0,1]^2$ in una griglia $(N+2)\times(N+2)$.
+
+\textbf{Output.} Due file di testo:
+\begin{itemize}
+  \item \texttt{coords.txt} — una riga per ogni nodo interno nella forma\\
+        \texttt{id\quad x\quad y},\quad con \texttt{id} $\in\{0,\dots,N^2-1\}$
+        e coordinate $x_i = i/(N+1)$, $y_j = j/(N+1)$;
+  \item \texttt{connectivity.txt} — una riga per ogni arco \texttt{u\quad v}
+        del grafo di adiacenza, con $\texttt{u} < \texttt{v}$, elencando tutte le
+        coppie di nodi interni collegati orizzontalmente o verticalmente.
+\end{itemize}
+
+\textbf{Funzionalità richieste.}
+\begin{itemize}
+  \item Generazione dei $N^2$ nodi interni con coordinate e identificatore numerico progressivo basato
+        sull'ordinamento naturale per righe: $\texttt{id}(i,j) = (i-1)\cdot N + (j-1)$ per $i,j\in\{1,\dots,N\}$.
+  \item Costruzione degli archi: per ogni nodo $(i,j)$ si aggiungono fino a
+        quattro archi verso $(i\pm 1,j)$ e $(i,j\pm 1)$, escludendo i punti di bordo.
+  \item Scrittura dei file \texttt{coords.txt} e \texttt{connectivity.txt}.
+\end{itemize}
+
+\textbf{Strutture dati.}
+\begin{itemize}
+  \item Array bidimensionale (o mappa) \texttt{id[i][j]} per la conversione
+        da indici di griglia $(i,j)$ a identificatore di nodo.
+  \item Lista di adiacenza \texttt{std::vector<std::vector<int>>} di dimensione $N^2$
+        per memorizzare i vicini di ciascun nodo.
+\end{itemize}
+
+\textbf{Complessità attesa.} Generazione e scrittura in tempo $O(N^2)$: ogni nodo
+possiede al più quattro vicini e il grafo ha al più $2N(N-1)$ archi.
+
+\textbf{Dipendenze.} Nessuna dipendenza da altri moduli; produce i file letti
+da \texttt{task2\_reorder.cpp} e \texttt{task3\_assemble.cpp}.
+
+% ---- Modulo 2 -----------------------------------------------
+\subsection*{Modulo 2 — \texttt{task2\_reorder.cpp}: nested dissection}
+
+\textbf{Input.}
+\begin{itemize}
+  \item \texttt{coords.txt} e \texttt{connectivity.txt} prodotti dal Modulo 1;
+  \item intero $N$ (da riga di comando o dedotto dal file).
+\end{itemize}
+
+\textbf{Output.} File \texttt{ordering.txt} con $N^2$ righe, ciascuna della forma\\
+\texttt{new\_id\quad old\_id},\quad dove \texttt{new\_id} $\in\{0,\dots,N^2-1\}$ è
+la posizione assegnata dalla nested dissection all'nodo di identificatore originale
+\texttt{old\_id}.
+
+\textbf{Funzionalità richieste.}
+\begin{itemize}
+  \item Lettura del grafo di adiacenza con coordinate geometriche.
+  \item Implementazione ricorsiva della nested dissection: dato un sottografo
+        indotto da un insieme $S \subseteq V$ con estensione geometrica $[x_{\min},x_{\max}]\times[y_{\min},y_{\max}]$:
+        \begin{enumerate}
+          \item scegliere l'asse di taglio (prima $x$, poi $y$ in alternanza);
+          \item individuare il separatore $V_S\subset S$ come l'insieme dei nodi
+                con coordinata sull'asse di taglio pari alla mediana;
+          \item enumerare ricorsivamente prima $V_1 = S\setminus(V_2\cup V_S)$
+                (sottodominio ``inferiore''), poi $V_2$ (sottodominio ``superiore''),
+                infine $V_S$ (separatore);
+        \end{enumerate}
+  \item Scrittura della permutazione risultante in \texttt{ordering.txt}.
+\end{itemize}
+
+\textbf{Strutture dati.}
+\begin{itemize}
+  \item Lista di adiacenza \texttt{std::vector<std::vector<int>>} con coordinate associate.
+  \item Coda (o vettore) per i nodi da etichettare ad ogni livello ricorsivo.
+  \item Array \texttt{perm[]} di dimensione $N^2$ che accumula la permutazione finale.
+\end{itemize}
+
+\textbf{Complessità attesa.} La nested dissection su griglia $N\times N$ richiede
+$O(N^2\log N)$ operazioni; la scrittura del file è $O(N^2)$.
+
+\textbf{Dipendenze.} Legge i file prodotti dal Modulo 1; produce \texttt{ordering.txt}
+usato dal Modulo 3.
+
+% ---- Modulo 3 -----------------------------------------------
+\subsection*{Modulo 3 — \texttt{task3\_assemble.cpp}: assemblaggio del sistema lineare}
+
+\textbf{Input.}
+\begin{itemize}
+  \item Intero $N$ (da riga di comando).
+  \item Flag opzionale \texttt{--reorder} che indica se usare l'ordinamento da
+        \texttt{ordering.txt} anziché quello naturale.
+  \item File \texttt{coords.txt} (per le coordinate dei nodi e il termine sorgente
+        $f$) e, se richiesto, \texttt{ordering.txt}.
+\end{itemize}
+
+\textbf{Output.}
+\begin{itemize}
+  \item \texttt{A.txt} — elenco delle entrate non nulle della matrice: una riga per entrata
+        nella forma \texttt{i\quad j\quad A[i,j]} rispetto all'ordinamento scelto;
+  \item \texttt{rhs.txt} — vettore dei termini noti: una riga per entrata contenente
+        il valore $b_k$, con le righe nello stesso ordine di \texttt{A.txt}.
+\end{itemize}
+
+\textbf{Funzionalità richieste.}
+\begin{itemize}
+  \item Calcolo del passo $h = 1/(N+1)$ e del coefficiente $\kappa = 0.01$.
+  \item Per ogni nodo interno $k$ (nel nuovo ordinamento): inserimento dell'entrata
+        diagonale $A[k,k] = -4\kappa/h^2$ e delle entrate fuori diagonale
+        $A[k,k']=+\kappa/h^2$ per ogni vicino $k'$; i vicini di bordo contribuiscono
+        solo al termine noto.
+  \item Valutazione del termine sorgente: $b_k = -f(x_{i(k)}, y_{j(k)})$ con
+        $f(x,y) = e^{-10(x^2+y^2)}$.
+  \item Applicazione della permutazione (se richiesta) per tradurre gli indici dal
+        sistema naturale al sistema riordinato.
+\end{itemize}
+
+\textbf{Invariante.} La matrice prodotta è simmetrica: ogni coppia $(i,j)$ con $i\neq j$
+compare due volte in \texttt{A.txt} con lo stesso valore.
+
+\textbf{Strutture dati.}
+\begin{itemize}
+  \item Array \texttt{perm[]} per la permutazione; \texttt{inv\_perm[]} per l'inversa.
+  \item Tripli \texttt{(i,j,val)} accumulati in un \texttt{std::vector} prima della scrittura.
+\end{itemize}
+
+\textbf{Complessità attesa.} Assemblaggio in $O(N^2)$ (al più 5 entrate per nodo);
+scrittura in $O(\text{nnz}) = O(N^2)$.
+
+\textbf{Dipendenze.} Legge \texttt{coords.txt} e opzionalmente \texttt{ordering.txt};
+produce i file letti dal Modulo 4.
+
+% ---- Modulo 4 -----------------------------------------------
+\subsection*{Modulo 4 — \texttt{solver.ipynb}: soluzione e analisi}
+
+\textbf{Input.}
+\begin{itemize}
+  \item \texttt{A.txt} e \texttt{rhs.txt} in formato sparso $(i,j,\text{val})$ / vettore.
+  \item Parametro $N$ (o serie di valori $N \in \{32, 64, 128, 256, 512, 1024\}$).
+\end{itemize}
+
+\textbf{Output.}
+\begin{itemize}
+  \item Soluzione $u \in \mathbb{R}^{N^2}$ del sistema $Au = b$ (riordinata nella
+        griglia originale per la visualizzazione).
+  \item Spy plot della struttura di $A$ prima e dopo il riordinamento.
+  \item Grafico della soluzione $u(x,y)$ come superficie o heatmap 2D.
+  \item Tabella/grafico comparativo di tempi di fattorizzazione e numero di
+        elementi non nulli di $L$ per le due strategie di ordinamento.
+\end{itemize}
+
+\textbf{Funzionalità richieste.}
+\begin{itemize}
+  \item Lettura dei file e costruzione di \texttt{scipy.sparse.csc\_matrix}.
+  \item Fattorizzazione $-A = LL^T$ tramite \texttt{sksparse.cholmod.cholesky}
+        con \texttt{order="natural"} (l'ordinamento è già codificato in $A$).
+  \item Soluzione del sistema lineare tramite \texttt{scipy.sparse.linalg.spsolve\_triangular}.
+  \item Misurazione del tempo di esecuzione (con \texttt{time.perf\_counter}) per
+        ciascun valore di $N$ e per entrambe le strategie di ordinamento.
+  \item Confronto del fill-in: conteggio di \texttt{nnz(L)} per ordinamento naturale
+        e nested dissection.
+\end{itemize}
+
+\textbf{Strutture dati.}
+\begin{itemize}
+  \item \texttt{scipy.sparse.csc\_matrix} per $A$ (e $-A$ per la fattorizzazione).
+  \item Array \texttt{numpy.ndarray} per il vettore $b$ e la soluzione $u$.
+  \item Oggetto \texttt{Factor} di CHOLMOD per la fattorizzazione.
+\end{itemize}
+
+\textbf{Complessità attesa.}
+Con ordinamento naturale: fill-in $O(N^3)$ e risoluzione $O(N^3)$.
+Con nested dissection: fill-in $O(N^2 \log N)$ e risoluzione $O(N^2 \log N)$.
+
+\textbf{Dipendenze.} Legge \texttt{A.txt} e \texttt{rhs.txt} prodotti dal Modulo 3;
+non genera file ma produce output grafico nel notebook.
+
+% ------------------------------------------------------------
+\section{Analisi sperimentale attesa}
+% ------------------------------------------------------------
+
+L'obiettivo dell'analisi sperimentale è quantificare il vantaggio computazionale
+della nested dissection rispetto all'ordinamento naturale. Si prevedono le
+seguenti misurazioni per $N \in \{32, 64, 128, 256, 512, 1024\}$:
+
+\begin{center}
+\begin{tabular}{|l|l|l|}
+  \hline
+  \textbf{Grandezza misurata} & \textbf{Ordinamento naturale} & \textbf{Nested dissection} \\
+  \hline
+  \texttt{nnz(A)} & $O(N^2)$ & $O(N^2)$ \\
+  \texttt{nnz(L)} (fill-in) & $O(N^3)$ & $O(N^2 \log N)$ \\
+  Tempo di fattorizzazione & $O(N^3)$ & $O(N^2 \log N)$ (atteso) \\
+  Tempo di risoluzione & $O(N^3)$ & $O(N^2 \log N)$ (atteso) \\
+  \hline
+\end{tabular}
+\end{center}
+
+\medskip
+Il notebook produrrà:
+\begin{enumerate}
+  \item Spy plot di $A$ e di $L$ (fattore di Cholesky) per entrambi gli ordinamenti,
+        per evidenziare visivamente la differenza di fill-in.
+  \item Heatmap 2D o superficie 3D della soluzione $u(x,y)$ per almeno un valore di $N$.
+  \item Grafico log-log di \texttt{nnz(L)} in funzione di $N$: le due curve dovrebbero
+        separare nettamente attorno a $N \ge 64$.
+  \item Grafico dei tempi di fattorizzazione in funzione di $N$, con indicazione della
+        pendenza empirica per stimare l'esponente di crescita.
+\end{enumerate}
 
 % ============================================================
 \end{document}
