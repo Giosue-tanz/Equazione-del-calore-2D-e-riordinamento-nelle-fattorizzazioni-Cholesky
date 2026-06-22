@@ -1,0 +1,254 @@
+% ============================================================
+%  Documento di Progetto — Informatica con Laboratorio 6CFU
+%  Equazione del Calore 2D e Riordinamento nelle
+%  Fattorizzazioni Cholesky
+%
+%  Compilare con:  pdflatex design.tex  (due passate)
+% ============================================================
+
+\documentclass[a4paper,12pt]{article}
+
+% ---- Pacchetti base ----------------------------------------
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[italian]{babel}
+\usepackage{lmodern}
+
+% ---- Layout (margini ridotti) ------------------------------
+\usepackage[
+  top=1.8cm, bottom=1.8cm,
+  left=1.8cm, right=1.8cm,
+  headheight=15pt
+]{geometry}
+\usepackage{parskip}
+\usepackage{microtype}
+
+% ---- Matematica --------------------------------------------
+\usepackage{amsmath, amssymb, amsthm}
+
+% ---- Codice ------------------------------------------------
+\usepackage{listings}
+\usepackage{xcolor}
+\lstset{
+  basicstyle=\ttfamily\small,
+  keywordstyle=\color{blue!70!black}\bfseries,
+  commentstyle=\color{green!50!black}\itshape,
+  numbers=left, numberstyle=\tiny\color{gray},
+  backgroundcolor=\color{gray!7},
+  frame=single, rulecolor=\color{gray!40},
+  breaklines=true, showstringspaces=false, tabsize=2
+}
+
+% ---- Float e TikZ -----------------------------------------
+\usepackage{float}
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric, arrows.meta, positioning, fit, backgrounds}
+
+% ---- Link --------------------------------------------------
+\usepackage[hidelinks]{hyperref}
+
+% ---- Intestazioni ------------------------------------------
+\usepackage{fancyhdr}
+
+
+
+% ---- Titolo ------------------------------------------------
+\title{%
+  \LARGE\textbf{Equazione del Calore 2D}\\[6pt]
+  \LARGE\textbf{e Riordinamento nelle Fattorizzazioni Cholesky}
+}
+\author{Giosuè Aiello}
+\date{}
+
+% ============================================================
+\begin{document}
+\maketitle
+% ============================================================
+
+% ------------------------------------------------------------
+\section{Impostazione del problema}
+% ------------------------------------------------------------
+
+L'obiettivo del progetto è la risoluzione numerica dell'equazione del calore in regime stazionario in due dimensioni spaziali. Il dominio di calcolo è il quadrato unitario $\Omega = [0,1]^2$, e si cerca la funzione di temperatura $u : \Omega \to \mathbb{R}$ che soddisfa l'equazione ellittica:
+
+\begin{equation}
+  \kappa \left(\frac{\partial^2 u}{\partial x^2} + \frac{\partial^2 u}{\partial y^2}\right) + f(x,y) = 0,
+  \qquad (x,y) \in \Omega,
+  \label{eq:calore}
+\end{equation}
+
+con condizioni al contorno di Dirichlet omogenee sul bordo $\partial\Omega$:
+\[
+  u(x,y) = u_0(x,y) \equiv 0, \qquad (x,y) \in \partial\Omega.
+\]
+
+I parametri fisici del problema sono: coefficiente di diffusività termica $\kappa = 0.01$ e termine sorgente $f(x,y) = e^{-10(x^2+y^2)}$, che modella una sorgente di calore concentrata in prossimità dell'origine con decadimento gaussiano.
+
+\subsection*{Discretizzazione alle differenze finite}
+
+Si introduce una griglia cartesiana uniforme di $(N+2)^2$ punti $(x_i, y_j)$ con $i,j = 0, \dots, N+1$ e passo $h = 1/(N+1)$, dove $x_i = i \cdot h$ e $y_j = j \cdot h$. I punti di bordo hanno temperatura fissata a zero e non contribuiscono come incognite. Le $N^2$ incognite del problema sono i valori $u_{i,j} \approx u(x_i, y_j)$ nei punti \emph{interni} ($1 \le i,j \le N$).
+
+Approssimando le derivate seconde con lo stencil a cinque punti, l'equazione~\eqref{eq:calore} valutata nel punto interno $(x_i, y_j)$ diventa:
+
+\begin{equation}
+  \frac{\kappa}{h^2}\bigl(u_{i-1,j} + u_{i+1,j} + u_{i,j-1} + u_{i,j+1} - 4\,u_{i,j}\bigr) + f(x_i,y_j) = 0.
+  \label{eq:stencil}
+\end{equation}
+
+Se un vicino cade sul bordo, il suo valore (zero) viene incorporato nel termine noto senza aggiungere incognite. L'insieme delle equazioni~\eqref{eq:stencil} costituisce il sistema lineare $Au = b$, dove $A \in \mathbb{R}^{N^2 \times N^2}$ è sparsa (al più 5 elementi non nulli per riga), simmetrica e definita negativa.
+
+\subsection*{Fattorizzazione di Cholesky e fill-in}
+
+Poiché $-A$ è simmetrica definita positiva (SPD), si può calcolare la fattorizzazione di Cholesky $-A = LL^T$ con $L$ triangolare inferiore sparsa. Tuttavia, durante la fattorizzazione si generano elementi non nulli in posizioni che erano zero in $-A$: questo fenomeno è detto \emph{fill-in} e dipende fortemente dall'ordine con cui le incognite sono enumerate.
+
+Con l'ordinamento naturale per righe, la larghezza di banda di $A$ è $\Theta(N)$ e il fill-in di $L$ è $O(N^3)$. La tecnica di \emph{nested dissection} riduce il fill-in a $O(N^2 \log N)$, con un risparmio sostanziale per valori grandi di $N$.
+
+\subsection*{Grafo di adiacenza e nested dissection}
+
+La struttura di $A$ è codificata dal \emph{grafo di adiacenza} $G = (V, E)$: ogni nodo $v \in V$ corrisponde a una variabile $u_{i,j}$ e ogni arco $(u,v) \in E$ indica che $A_{uv} \neq 0$. Per la griglia regolare, due nodi sono collegati se e solo se sono vicini orizzontalmente o verticalmente:
+\[
+  (x_i, y_j) \leftrightarrow (x_k, y_l) \iff (i=k,\, |j-l|=1) \;\text{ oppure }\; (j=l,\, |i-k|=1).
+\]
+
+La \emph{nested dissection} individua ricorsivamente un separatore geometrico $V_S$ di cardinalità ridotta che divide $V$ in due insiemi bilanciati $V_1$ e $V_2$ senza archi diretti tra loro. L'ordinamento risultante elenca prima $V_1$, poi $V_2$, infine $V_S$, in modo che il separatore appaia in fondo alla matrice, limitando la propagazione del fill-in. Per la griglia regolare il separatore ottimale è la colonna mediana: scelto $\hat{x}$ mediano, si pone $V_1 = \{u_{i,j}\mid x_i < \hat{x}\}$, $V_2 = \{u_{i,j}\mid x_i > \hat{x}\}$, $V_S = \{u_{i,j}\mid x_i = \hat{x}\}$. Il procedimento viene applicato ricorsivamente a $V_1$ e $V_2$, alternando il taglio lungo $x$ e $y$.
+
+% ------------------------------------------------------------
+\section{Architettura del progetto}
+% ------------------------------------------------------------
+
+Il progetto è strutturato in quattro moduli. I tre moduli in C++ comunicano tra loro attraverso file di testo con formato fisso che fungono da interfaccia verificabile indipendentemente; il modulo Python li legge come punto di ingresso per la fase numerica finale.
+
+Il diagramma seguente illustra il flusso di elaborazione dall'input $N$ alla soluzione e all'analisi comparativa:
+
+\bigskip
+
+% ---- Diagramma pipeline (verticale formale) --------
+\begin{center}
+\begin{tikzpicture}[
+  node distance = 0.6cm and 1.8cm,
+  modcpp/.style = {
+    rectangle,
+    draw=black!70, fill=gray!10, line width=0.8pt,
+    text width=4.5cm, align=center,
+    font=\small\ttfamily\bfseries, minimum height=1.1cm, inner sep=4pt
+  },
+  modpy/.style = {
+    rectangle,
+    draw=black!70, fill=gray!25, line width=0.8pt,
+    text width=4.5cm, align=center,
+    font=\small\ttfamily\bfseries, minimum height=1.1cm, inner sep=4pt
+  },
+  filebox/.style = {
+    rectangle,
+    draw=black!50, fill=white, line width=0.5pt,
+    text width=3.5cm, align=center,
+    font=\footnotesize\ttfamily, minimum height=0.80cm, inner sep=3pt
+  },
+  startnode/.style = {
+    rectangle,
+    draw=black!70, fill=white, line width=0.8pt,
+    font=\small\bfseries, align=center,
+    minimum height=0.85cm, minimum width=2.5cm
+  },
+  arr/.style     = {-{Stealth[length=6pt]}, line width=0.8pt, black!80},
+  arrfile/.style = {-{Stealth[length=5pt]}, line width=0.6pt,
+                    dashed, dash pattern=on 4pt off 2pt, black!60}
+]
+
+% --- colonna sinistra: pipeline ---
+\node[startnode] (IN) {Input $N$};
+\node[modcpp] (T1) [below=0.6cm of IN]
+  {task1\_grid.cpp\\[2pt]{\normalfont\footnotesize\rmfamily Griglia e grafo}};
+\node[modcpp] (T2) [below=1.2cm of T1]
+  {task2\_reorder.cpp\\[2pt]{\normalfont\footnotesize\rmfamily Nested Dissection}};
+\node[modcpp] (T3) [below=1.2cm of T2]
+  {task3\_assemble.cpp\\[2pt]{\normalfont\footnotesize\rmfamily Sistema lineare}};
+\node[modpy]  (NB) [below=1.2cm of T3]
+  {solver.ipynb\\[2pt]{\normalfont\footnotesize\rmfamily Cholesky $+$ analisi}};
+
+% --- colonna destra: file ---
+\node[filebox] (F1) [right=1.8cm of T1] {coords.txt\\connectivity.txt};
+\node[filebox] (F2) [right=1.8cm of T2] {ordering.txt};
+\node[filebox] (F3) [right=1.8cm of T3] {A.txt \quad rhs.txt};
+
+% --- frecce pipeline (verticali, bordo-a-bordo) ---
+\draw[arr] (IN.south) -- (T1.north);
+\draw[arr] (T1.south) -- (T2.north);
+\draw[arr] (T2.south) -- (T3.north);
+\draw[arr] (T3.south) -- (NB.north);
+
+% --- frecce output verso file (orizzontali, bordo-a-bordo) ---
+\draw[arrfile] (T1.east) -- (F1.west);
+\draw[arrfile] (T2.east) -- (F2.west);
+\draw[arrfile] (T3.east) -- (F3.west);
+
+% --- frecce file verso modulo successivo (ortogonali a gradino per evitare i blocchi) ---
+\draw[arrfile] (F1.south) -- ++(0,-0.35) -| ([xshift=0.9cm]T2.east) -- (T2.east);
+\draw[arrfile] (F2.south) -- ++(0,-0.35) -| ([xshift=0.9cm]T3.east) -- (T3.east);
+\draw[arrfile] (F3.south) -- ++(0,-0.35) -| ([xshift=0.9cm]NB.east) -- (NB.east);
+
+\end{tikzpicture}
+
+\smallskip
+{\footnotesize\rmfamily
+\rule{1.5em}{0.8pt}\quad Flusso di esecuzione\qquad
+\raisebox{2pt}{\tikz{\draw[dashed, dash pattern=on 4pt off 2pt] (0,0) -- (1.5em,0);}}\quad Output su file\qquad
+$\square$\quad Moduli C++\qquad
+\textcolor{black!55}{$\blacksquare$}\quad Modulo Python
+}
+\end{center}
+
+\newpage
+
+Ogni modulo ha un ruolo preciso all'interno della pipeline:
+
+\medskip
+\begin{center}
+\begin{tikzpicture}[
+  card/.style = {
+    rectangle,
+    draw=black!60, fill=gray!8, line width=0.6pt,
+    text width=16.5cm, align=left,
+    font=\small\rmfamily, inner sep=8pt, minimum height=1.1cm
+  },
+  cardpy/.style = {
+    rectangle,
+    draw=black!60, fill=gray!18, line width=0.6pt,
+    text width=16.5cm, align=left,
+    font=\small\rmfamily, inner sep=8pt, minimum height=1.1cm
+  }
+]
+  \node[card] (r0) at (0, 0)
+    {\textbf{\texttt{task1\_grid.cpp}} \hfill \textit{\footnotesize C++}\\[3pt]
+     Riceve $N$; genera i $N^2$ nodi interni con indici e coordinate
+     (\texttt{coords.txt}) e la lista degli archi del grafo di adiacenza
+     (\texttt{connectivity.txt}).};
+
+  \node[card] (r1) [below=0.28cm of r0]
+    {\textbf{\texttt{task2\_reorder.cpp}} \hfill \textit{\footnotesize C++}\\[3pt]
+     Legge il grafo e calcola la permutazione nested dissection ricorsiva:
+     ad ogni livello individua il separatore geometrico mediano (alternando asse
+     $x$ e $y$) e lo posiziona in coda. Salva la corrispondenza in \texttt{ordering.txt}.};
+
+  \node[card] (r2) [below=0.28cm of r1]
+    {\textbf{\texttt{task3\_assemble.cpp}} \hfill \textit{\footnotesize C++}\\[3pt]
+     Assembla la matrice sparsa $A$ (stencil a 5 punti: $-4\kappa/h^2$
+     in diagonale, $+\kappa/h^2$ fuori diagonale) e il termine noto $b$. Supporta ordinamento naturale e
+     nested dissection. Produce \texttt{A.txt} e \texttt{rhs.txt}.};
+
+  \node[cardpy] (r3) [below=0.28cm of r2]
+    {\textbf{\texttt{solver.ipynb}} \hfill \textit{\footnotesize Python}\\[3pt]
+     Carica \texttt{A.txt} e \texttt{rhs.txt} in formato CSC; fattorizza
+     $-A = LL^T$ con \texttt{sksparse.cholmod}; risolve con
+     \texttt{spsolve\_triangular}. Confronta tempi per $N = 32 \dots 1024$; produce spy plot e grafici
+     della soluzione $u(x,y)$.};
+\end{tikzpicture}
+\end{center}
+
+\bigskip
+
+Le strutture dati fondamentali sono: liste di adiacenza (\texttt{std::vector<std::vector<int>>}) per il grafo nei moduli C++, e matrici sparse in formato CSC (\texttt{scipy.sparse.csc\_matrix}) nel modulo Python. Questo schema iniziale verrà progressivamente arricchito con la specifica di input, output, invarianti e complessità di ciascun modulo, man mano che il codice viene sviluppato.
+
+% ============================================================
+\end{document}
+% ============================================================

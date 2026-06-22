@@ -58,6 +58,18 @@ compile_commands.json
 *.bak
 *.swp
 
+# LaTeX auxiliary files
+docs/*.aux
+docs/*.log
+docs/*.toc
+docs/*.out
+docs/*.fls
+docs/*.fdb_latexmk
+docs/*.synctex.gz
+docs/*.blg
+docs/*.bbl
+
+
 # vcpkg
 vcpkg_installed/
 
