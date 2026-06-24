@@ -4,8 +4,10 @@
 #include <string>
 #include <cstdlib>
 #include <iomanip>
+#include <chrono>   // [MIGLIORAMENTO] benchmark tempi come nel codice del prof (qs.cpp)
 
 using namespace std;
+using namespace chrono;
 
 // Funzione per calcolare l'identificatore univoco del nodo a partire dagli indici (i, j)
 // i, j vanno da 1 a N.
@@ -29,6 +31,9 @@ int main(int argc, char* argv[]) {
     int num_nodes = N * N;
 
     // --- Generazione Nodi (coords.txt) ---
+    // [MIGLIORAMENTO] misurazione del tempo con chrono (tecnica dal codice del prof)
+    auto start_coords = high_resolution_clock::now();
+
     ofstream coords_file("coords.txt");
     if (!coords_file.is_open()) {
         cerr << "Errore: impossibile creare coords.txt" << endl;
@@ -50,7 +55,13 @@ int main(int argc, char* argv[]) {
     }
     coords_file.close();
 
+    auto end_coords = high_resolution_clock::now();
+    duration<double, milli> tempo_coords = end_coords - start_coords;
+
     // --- Generazione Grafo di Adiacenza (connectivity.txt) ---
+    // [MIGLIORAMENTO] misurazione del tempo con chrono (tecnica dal codice del prof)
+    auto start_conn = high_resolution_clock::now();
+
     // Usiamo una lista di adiacenza come richiesto dal documento di progetto
     vector<vector<int>> adj_list(num_nodes);
     for (int i = 0; i < num_nodes; ++i) {
@@ -97,8 +108,16 @@ int main(int argc, char* argv[]) {
     }
     conn_file.close();
 
+    auto end_conn = high_resolution_clock::now();
+    duration<double, milli> tempo_conn = end_conn - start_conn;
+
     cout << "Griglia e grafo generati con successo per N = " << N << "." << endl;
     cout << "File creati: coords.txt, connectivity.txt" << endl;
+    cout << "\n=== BENCHMARK ==" << endl;
+    cout << fixed << setprecision(3);
+    cout << "  Generazione coords.txt  : " << tempo_coords.count() << " ms" << endl;
+    cout << "  Generazione connectivity : " << tempo_conn.count()   << " ms" << endl;
+    cout << "  Totale                  : " << (tempo_coords + tempo_conn).count() << " ms" << endl;
 
     return 0;
 }
