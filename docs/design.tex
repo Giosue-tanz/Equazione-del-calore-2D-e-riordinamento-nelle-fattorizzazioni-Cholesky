@@ -281,6 +281,7 @@ discretizzazione uniforme del dominio $[0,1]^2$ in una griglia $(N+2)\times(N+2)
   \item Costruzione degli archi: per ogni nodo $(i,j)$ si aggiungono fino a
         quattro archi verso $(i\pm 1,j)$ e $(i,j\pm 1)$, escludendo i punti di bordo.
   \item Scrittura dei file \texttt{coords.txt} e \texttt{connectivity.txt}.
+  \item Misurazione dei tempi di esecuzione per la generazione dei nodi e del grafo tramite la libreria standard \texttt{<chrono>}.
 \end{itemize}
 
 \textbf{Strutture dati.}
@@ -314,23 +315,24 @@ la posizione assegnata dalla nested dissection all'nodo di identificatore origin
 \textbf{Funzionalità richieste.}
 \begin{itemize}
   \item Lettura del grafo di adiacenza con coordinate geometriche.
-  \item Implementazione ricorsiva della nested dissection: dato un sottografo
+  \item Implementazione iterativa della nested dissection (basata su uno stack esplicito in memoria heap per prevenire stack overflow su griglie di grandi dimensioni): dato un sottografo
         indotto da un insieme $S \subseteq V$ con estensione geometrica $[x_{\min},x_{\max}]\times[y_{\min},y_{\max}]$:
         \begin{enumerate}
           \item scegliere l'asse di taglio (prima $x$, poi $y$ in alternanza);
           \item individuare il separatore $V_S\subset S$ come l'insieme dei nodi
                 con coordinata sull'asse di taglio pari alla mediana;
-          \item enumerare ricorsivamente prima $V_1 = S\setminus(V_2\cup V_S)$
+          \item processare in modo iterativo prima $V_1 = S\setminus(V_2\cup V_S)$
                 (sottodominio ``inferiore''), poi $V_2$ (sottodominio ``superiore''),
-                infine $V_S$ (separatore);
+                aggiungendo infine $V_S$ (separatore) all'ordinamento;
         \end{enumerate}
+  \item Misurazione del tempo di esecuzione dell'algoritmo tramite \texttt{<chrono>}.
   \item Scrittura della permutazione risultante in \texttt{ordering.txt}.
 \end{itemize}
 
 \textbf{Strutture dati.}
 \begin{itemize}
   \item Lista di adiacenza \texttt{std::vector<std::vector<int>>} con coordinate associate.
-  \item Coda (o vettore) per i nodi da etichettare ad ogni livello ricorsivo.
+  \item Struttura dati \texttt{std::stack} per gestire in modo iterativo i sottoproblemi da elaborare (emulando lo stack di chiamate).
   \item Array \texttt{perm[]} di dimensione $N^2$ che accumula la permutazione finale.
 \end{itemize}
 
