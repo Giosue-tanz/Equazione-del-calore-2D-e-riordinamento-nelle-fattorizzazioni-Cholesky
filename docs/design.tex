@@ -88,6 +88,75 @@ I parametri fisici del problema sono: coefficiente di diffusività termica $\kap
 
 Si introduce una griglia cartesiana uniforme di $(N+2)^2$ punti $(x_i, y_j)$ con $i,j = 0, \dots, N+1$ e passo $h = 1/(N+1)$, dove $x_i = i \cdot h$ e $y_j = j \cdot h$. I punti di bordo hanno temperatura fissata a zero e non contribuiscono come incognite. Le $N^2$ incognite del problema sono i valori $u_{i,j} \approx u(x_i, y_j)$ nei punti \emph{interni} ($1 \le i,j \le N$).
 
+\begin{figure}[htbp]
+    \centering
+    \begin{tikzpicture}[scale=0.9]
+        % Definizione dei colori per corrispondere all'immagine originale
+        \colorlet{bdraw}{black!60}
+        \colorlet{bfill}{gray!20}
+        \colorlet{idraw}{blue!80!black}
+        \colorlet{ifill}{blue!70!white}
+        \colorlet{rdraw}{red!80!black}
+        \colorlet{rfill}{red!70!white}
+
+        % --- GRIGLIA ---
+        % Griglia unica e uniforme per eliminare l'effetto "cornice" spezzata sui lati
+        \draw[black!40, thin] (0,0) grid (7,7);
+
+        % --- STILI PER I NODI ---
+        % Pallini resi un filo più sottili (inner sep ridotto da 1.8pt a 1.2pt)
+        \tikzset{
+            bnode/.style={circle, draw=bdraw, fill=bfill, inner sep=1.2pt},
+            inode/.style={circle, draw=idraw, fill=ifill, inner sep=1.2pt},
+            rnode/.style={circle, draw=rdraw, fill=rfill, inner sep=1.2pt}
+        }
+
+        % --- DISEGNO DEI PUNTI ---
+        % Punti del bordo (grigi)
+        \foreach \x in {0,...,7} {
+            \node[bnode] at (\x,0) {};
+            \node[bnode] at (\x,7) {};
+        }
+        \foreach \y in {1,...,6} {
+            \node[bnode] at (0,\y) {};
+            \node[bnode] at (7,\y) {};
+        }
+
+        % Punti interni (blu)
+        \foreach \x in {1,...,6} {
+            \foreach \y in {1,...,6} {
+                \node[inode] (N-\x-\y) at (\x,\y) {};
+            }
+        }
+
+        % Punto evidenziato (rosso) in posizione (2,2) 
+        % (considerando che l'angolo in basso a sinistra è 0,0)
+        \node[rnode] (R) at (2,2) {};
+
+        % --- FRECCE ---
+        % Frecce dal punto rosso verso i 4 punti adiacenti
+        \draw[->, >=stealth, rdraw, thick] (R) -- (N-1-2);
+        \draw[->, >=stealth, rdraw, thick] (R) -- (N-3-2);
+        \draw[->, >=stealth, rdraw, thick] (R) -- (N-2-1);
+        \draw[->, >=stealth, rdraw, thick] (R) -- (N-2-3);
+
+        % Etichetta del punto rosso (font sistemato, dimensione ridotta)
+        \node[above right, text=rdraw, fill=white, inner sep=1.5pt, xshift=2pt, yshift=2pt, font=\small] at (R) {$(x_i, y_j)$};
+
+        % --- ETICHETTE DEGLI ASSI E COORDINATE ---
+        % Font proporzionati per renderli più simili all'originale
+        \node[below left=2pt, font=\footnotesize] at (0,0) {$(0,0)$};
+        \node[below right=2pt, font=\footnotesize] at (7,0) {$(1,0)$};
+        \node[above right=2pt, font=\footnotesize] at (7,7) {$(1,1)$};
+
+        \node[below, font=\small] at (3.5, -0.6) {$x$};
+        \node[left, font=\small] at (-0.6, 3.5) {$y$};
+
+    \end{tikzpicture}
+    
+    \caption{Punti esterni ed interni del dominio, segnati rispettivamente in grigio ed in blu, e punti adiacenti, evidenziati in rosso per un punto di esempio $(x_i, y_j)$.}
+\end{figure}
+
 Approssimando le derivate seconde con lo stencil a cinque punti, l'equazione~\eqref{eq:calore} valutata nel punto interno $(x_i, y_j)$ diventa:
 
 \begin{equation}
@@ -96,6 +165,8 @@ Approssimando le derivate seconde con lo stencil a cinque punti, l'equazione~\eq
 \end{equation}
 
 Se un vicino cade sul bordo, il suo valore (zero) viene incorporato nel termine noto senza aggiungere incognite. L'insieme delle equazioni~\eqref{eq:stencil} costituisce il sistema lineare $Au = b$, dove $A \in \mathbb{R}^{N^2 \times N^2}$ è sparsa (al più 5 elementi non nulli per riga), simmetrica e definita negativa.
+
+\newpage
 
 \subsection*{Fattorizzazione di Cholesky e fill-in}
 
@@ -250,7 +321,7 @@ Ogni modulo ha un ruolo preciso all'interno della pipeline:
 Le strutture dati fondamentali sono: liste di adiacenza (\texttt{std::vector<std::vector<int>>}) per il grafo nei moduli C++, e matrici sparse in formato CSC (\texttt{scipy.sparse.csc\_matrix}) nel modulo Python.
 
 % ------------------------------------------------------------
-\section{Specifica dei moduli}
+\section{Specifiche dei moduli}
 % ------------------------------------------------------------
 
 I quattro moduli vengono di seguito descritti con livello di dettaglio crescente:
@@ -260,43 +331,118 @@ complessità attesa.
 % ---- Modulo 1 -----------------------------------------------
 \subsection*{Modulo 1 — \texttt{task1\_grid.cpp}: generazione della griglia e del grafo}
 
-\textbf{Input.} Intero $N \ge 1$ passato da riga di comando, che determina la
-discretizzazione uniforme del dominio $[0,1]^2$ in una griglia $(N+2)\times(N+2)$.
+Il Modulo 1 è responsabile della creazione della struttura geometrica del dominio e del relativo grafo di adiacenza. Per realizzarlo, abbiamo deciso di scriverlo interamente in C++17 ponendo particolare attenzione alla leggibilità e all'efficienza. Di seguito ripercorriamo il ragionamento logico che ci ha guidato nella costruzione di questo modulo, passo dopo passo.
 
-\textbf{Output.} Due file di testo:
-\begin{itemize}
-  \item \texttt{coords.txt} — una riga per ogni nodo interno nella forma\\
-        \texttt{n\quad i\quad j\quad x\quad y},\quad con \texttt{n} $\in\{0,\dots,N^2-1\}$
-        (identificatore), indici di griglia \texttt{i, j} $\in\{1,\dots,N\}$ e coordinate $x_i = i/(N+1)$, $y_j = j/(N+1)$
-        (utili nel Modulo 2 per calcolare il separatore geometrico senza ridedurli);
-  \item \texttt{connectivity.txt} — una riga per ogni arco \texttt{u\quad v}
-        del grafo di adiacenza, con $\texttt{u} < \texttt{v}$, elencando tutte le
-        coppie di nodi interni collegati orizzontalmente o verticalmente.
-\end{itemize}
+\newpage
+\subsubsection*{1. Impostazione e Controllo dei Parametri}
+Come prima cosa, avevamo bisogno di impostare il punto di ingresso del nostro programma e di assicurarci di gestire correttamente la directory in cui avremmo salvato i risultati. Abbiamo quindi definito una costante logica per la cartella di destinazione e impostato dei controlli base sui parametri forniti dall'utente, in modo da bloccare subito l'esecuzione se viene passato un $N$ non valido.
+\begin{lstlisting}[language=C++]
+// Cartella in cui verranno salvati tutti i file generati
+static const string CARTELLA_OUTPUT = "output/";
 
-\textbf{Funzionalità richieste.}
-\begin{itemize}
-  \item Generazione dei $N^2$ nodi interni con coordinate e identificatore numerico progressivo basato
-        sull'ordinamento naturale per righe: $\texttt{id}(i,j) = (i-1)\cdot N + (j-1)$ per $i,j\in\{1,\dots,N\}$.
-  \item Costruzione degli archi: per ogni nodo $(i,j)$ si aggiungono fino a
-        quattro archi verso $(i\pm 1,j)$ e $(i,j\pm 1)$, escludendo i punti di bordo.
-  \item Scrittura dei file \texttt{coords.txt} e \texttt{connectivity.txt}.
-  \item Misurazione dei tempi di esecuzione per la generazione dei nodi e del grafo tramite la libreria standard \texttt{<chrono>}.
-\end{itemize}
+// Calcola l'identificatore numerico univoco (ID) di un nodo
+inline int calcola_id_nodo(int i, int j, int N) {
+    return (i - 1) * N + (j - 1);
+}
 
-\textbf{Strutture dati.}
-\begin{itemize}
-  \item Array bidimensionale (o mappa) \texttt{id[i][j]} per la conversione
-        da indici di griglia $(i,j)$ a identificatore di nodo.
-  \item Lista di adiacenza \texttt{std::vector<std::vector<int>>} di dimensione $N^2$
-        per memorizzare i vicini di ciascun nodo (si raccomanda l'uso di \texttt{std::vector::reserve()} per pre-allocare memoria ed evitare riallocazioni, specialmente per $N$ grandi).
-\end{itemize}
+int main(int argc, char* argv[]) {
+    if (argc != 2) {
+        cerr << "Uso: " << argv[0] << " <N>" << endl;
+        return 1;
+    }
+    int N = stoi(argv[1]);
+    if (N <= 0) return 1;
+    
+    int numero_nodi = N * N;
+    // Crea la cartella output/ se non esiste
+    mkdir(CARTELLA_OUTPUT.c_str(), 0755); 
+\end{lstlisting}
 
-\textbf{Complessità attesa.} Generazione e scrittura in tempo $O(N^2)$: ogni nodo
-possiede al più quattro vicini e il grafo ha al più $2N(N-1)$ archi.
+\subsubsection*{2. Generazione dei Nodi e Scrittura delle Coordinate}
+Una volta preparato l'ambiente, il passo successivo è stato generare i nodi veri e propri. Abbiamo scelto di scorrere la griglia iterando sulle righe e sulle colonne in modo naturale. Per ogni nodo calcoliamo il suo ID univoco (tramite la funzione \texttt{calcola\_id\_nodo}) e determiniamo le coordinate spaziali normalizzate nell'intervallo $(0, 1)$, scrivendo subito il risultato su disco per risparmiare memoria.
+\begin{lstlisting}[language=C++]
+    // --- Generazione Nodi ---
+    auto inizio_coordinate = high_resolution_clock::now();
+    ofstream file_coordinate(CARTELLA_OUTPUT + "coords.txt");
+    file_coordinate << fixed << setprecision(8);
 
-\textbf{Dipendenze.} Nessuna dipendenza da altri moduli; produce i file letti
-da \texttt{task2\_reorder.cpp} e \texttt{task3\_assemble.cpp}.
+    for (int i = 1; i <= N; ++i) {
+        for (int j = 1; j <= N; ++j) {
+            int id_nodo = calcola_id_nodo(i, j, N);
+            double x = (double)i / (N + 1);
+            double y = (double)j / (N + 1);
+            
+            // Formato: id riga colonna x y
+            file_coordinate << id_nodo << " " << i << " " << j 
+                            << " " << x << " " << y << "\n";
+        }
+    }
+    file_coordinate.close();
+    auto fine_coordinate = high_resolution_clock::now();
+\end{lstlisting}
+Abbiamo forzato l'uso di \texttt{setprecision(8)} per essere sicuri che i valori in virgola mobile non perdessero precisione. Questo dettaglio si è rivelato fondamentale in seguito per calcolare in modo corretto la mediana geometrica nel modulo di partizionamento.
+
+\subsubsection*{3. Costruzione del Grafo di Connessione}
+A questo punto avevamo i nodi geometrici, ma ci serviva una struttura logica che rappresentasse i legami fisici della griglia. Abbiamo perciò optato per una lista di adiacenza bidirezionale.
+\begin{lstlisting}[language=C++]
+    // --- Generazione Grafo di Connessione ---
+    auto inizio_connettivita = high_resolution_clock::now();
+    vector<vector<int>> lista_adiacenza(numero_nodi);
+    for (int i = 0; i < numero_nodi; ++i) {
+        lista_adiacenza[i].reserve(4); // Prevenzione riallocazioni
+    }
+
+    for (int i = 1; i <= N; ++i) {
+        for (int j = 1; j <= N; ++j) {
+            int u = calcola_id_nodo(i, j, N);
+            if (j < N) { // Connessione con il vicino in alto
+                int v_alto = calcola_id_nodo(i, j + 1, N);
+                lista_adiacenza[u].push_back(v_alto);
+                lista_adiacenza[v_alto].push_back(u);
+            }
+            if (i < N) { // Connessione con il vicino a destra
+                int v_destra = calcola_id_nodo(i + 1, j, N);
+                lista_adiacenza[u].push_back(v_destra);
+                lista_adiacenza[v_destra].push_back(u);
+            }
+        }
+    }
+\end{lstlisting}
+Per evitare che il vettore \texttt{lista\_adiacenza} venisse continuamente ridimensionato (rallentando pesantemente l'esecuzione), abbiamo pre-allocato la memoria usando \texttt{reserve(4)}, dal momento che sapevamo in anticipo che i nodi avrebbero avuto al massimo 4 vicini. Nel ciclo principale, per evitare controlli ridondanti, abbiamo scelto un approccio costruttivo ``in avanti'': colleghiamo il nodo corrente soltanto con il suo vicino in alto e con quello a destra, aggiornando le due direzioni contemporaneamente.
+
+\subsubsection*{4. Scrittura del Grafo ed Estrazione degli Archi}
+Infine, dovevamo convertire questa struttura in memoria in un formato testuale semplice. Scorrendo la lista di adiacenza, abbiamo imposto una basilare regola di disuguaglianza ($u < v$) in modo da essere certi di scrivere ogni arco non orientato esattamente una volta sola.
+\begin{lstlisting}[language=C++]
+    ofstream file_connettivita(CARTELLA_OUTPUT + "connectivity.txt");
+    for (int u = 0; u < numero_nodi; ++u) {
+        for (int v : lista_adiacenza[u]) {
+            if (u < v) { // Scrive l'arco non orientato una sola volta
+                file_connettivita << u << " " << v << "\n";
+            }
+        }
+    }
+    file_connettivita.close();
+    auto fine_connettivita = high_resolution_clock::now();
+\end{lstlisting}
+
+\subsubsection*{5. Benchmark e Conclusione}
+Per accertarci che le nostre scelte implementative fossero davvero efficienti, abbiamo integrato fin dall'inizio un sistema di \textit{profiling} interno tramite la libreria \texttt{<chrono>}, per misurare i tempi effettivi di processamento.
+\begin{lstlisting}[language=C++]
+    // Benchmark delle performance temporali
+    duration<double, milli> tempo_coordinate = 
+        fine_coordinate - inizio_coordinate;
+    duration<double, milli> tempo_connettivita = 
+        fine_connettivita - inizio_connettivita;
+
+    cout << "Scrittura coords.txt       : " 
+         << tempo_coordinate.count() << " ms\n";
+    cout << "Scrittura connectivity.txt : " 
+         << tempo_connettivita.count() << " ms\n";
+    
+    return 0;
+}
+\end{lstlisting}
+Questa struttura dal design lineare ci ha fornito una base solida e scattante, regalandoci gli input puliti e minimali necessari per iniziare lo sviluppo del \texttt{task2\_reorder.cpp}.
 
 % ---- Modulo 2 -----------------------------------------------
 \subsection*{Modulo 2 — \texttt{task2\_reorder.cpp}: nested dissection}
