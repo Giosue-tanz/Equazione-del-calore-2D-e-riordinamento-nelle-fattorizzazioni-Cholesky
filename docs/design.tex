@@ -331,11 +331,22 @@ complessità attesa.
 % ---- Modulo 1 -----------------------------------------------
 \subsection*{Modulo 1 — \texttt{task1\_grid.cpp}: generazione della griglia e del grafo}
 
-Il Modulo 1 è responsabile della creazione della struttura geometrica del dominio e del relativo grafo di adiacenza. Per realizzarlo, abbiamo deciso di scriverlo interamente in C++17 ponendo particolare attenzione alla leggibilità e all'efficienza. Di seguito ripercorriamo il ragionamento logico che ci ha guidato nella costruzione di questo modulo, passo dopo passo.
+Il Modulo 1 è responsabile della creazione della struttura geometrica del dominio e del relativo grafo di adiacenza. Per realizzarlo, ho deciso di scriverlo interamente in C++17 ponendo particolare attenzione alla leggibilità e all'efficienza. Di seguito ripercorro il ragionamento logico che mi ha guidato nella costruzione di questo modulo, passo dopo passo.
+
+\subsubsection*{Formalizzazione Matematica del Dominio e del Grafo}
+Dal punto di vista matematico, il dominio spaziale continuo $\Omega = [0,1]^2$ viene discretizzato in una griglia uniforme. Dato il parametro $N$, il passo spaziale risulta definito come $h = \frac{1}{N+1}$. L'insieme dei nodi interni, che corrispondono alle incognite numeriche del nostro problema differenziale, è descritto dall'insieme:
+\[
+  V = \{ (x_i, y_j) \mid x_i = i \cdot h, \; y_j = j \cdot h \quad \forall\, i, j \in \{1, \dots, N\} \}
+\]
+La cardinalità di tale insieme è $|V| = N^2$. Al fine di applicare lo stencil alle differenze finite a 5 punti, si costruisce un grafo non orientato $G = (V, E)$, in cui l'insieme degli spigoli $E$ modella l'adiacenza fisica. Due nodi interni $u = (x_i, y_j)$ e $v = (x_k, y_l)$ sono tra loro adiacenti se e solo se la loro distanza euclidea è esattamente pari al passo $h$:
+\[
+  E = \left\{ \{u, v\} \subset V \mathrel{\bigg|} \sqrt{(x_i - x_k)^2 + (y_j - y_l)^2} = h \right\}
+\]
+Operativamente, ciò implica che il nodo identificato dagli indici logici $(i,j)$ è connesso ai suoi vicini orizzontali $(i\pm 1, j)$ e verticali $(i, j\pm 1)$, purché tali punti ricadano all'interno del dominio $V$. Agli spigoli viene associata una numerazione intera 1D (o \textit{ID}), ottenuta concatenando le righe della griglia.
 
 \newpage
 \subsubsection*{1. Impostazione e Controllo dei Parametri}
-Come prima cosa, avevamo bisogno di impostare il punto di ingresso del nostro programma e di assicurarci di gestire correttamente la directory in cui avremmo salvato i risultati. Abbiamo quindi definito una costante logica per la cartella di destinazione e impostato dei controlli base sui parametri forniti dall'utente, in modo da bloccare subito l'esecuzione se viene passato un $N$ non valido.
+Come prima cosa, avevo bisogno di impostare il punto di ingresso del mio programma e di assicurarmi di gestire correttamente la directory in cui avrei salvato i risultati. Ho quindi definito una costante logica per la cartella di destinazione e impostato un sistema robusto di controllo sui parametri: se il valore $N$ passato da riga di comando è mancante o non valido (es. stringhe testuali o valori negativi), il programma non si interrompe bruscamente ma entra in un ciclo che richiede interattivamente all'utente un input corretto.
 \begin{lstlisting}[language=C++]
 // Cartella in cui verranno salvati tutti i file generati
 static const string CARTELLA_OUTPUT = "output/";
@@ -346,12 +357,33 @@ inline int calcola_id_nodo(int i, int j, int N) {
 }
 
 int main(int argc, char* argv[]) {
-    if (argc != 2) {
+    int N = 0;
+    bool valid = false;
+
+    if (argc == 2) {
+        try {
+            N = stoi(argv[1]);
+            if (N > 0) valid = true;
+            else cerr << "Errore: N deve essere > 0." << endl;
+        } catch (...) {
+            cerr << "Errore: intero non valido." << endl;
+        }
+    } else {
         cerr << "Uso: " << argv[0] << " <N>" << endl;
-        return 1;
     }
-    int N = stoi(argv[1]);
-    if (N <= 0) return 1;
+
+    while (!valid) {
+        cout << "Inserisci un valore intero N > 0: ";
+        string input;
+        if (!(cin >> input)) return 1;
+        try {
+            N = stoi(input);
+            if (N > 0) valid = true;
+            else cerr << "Errore: N deve essere > 0." << endl;
+        } catch (...) {
+            cerr << "Errore: formato non valido." << endl;
+        }
+    }
     
     int numero_nodi = N * N;
     // Crea la cartella output/ se non esiste
@@ -359,7 +391,7 @@ int main(int argc, char* argv[]) {
 \end{lstlisting}
 
 \subsubsection*{2. Generazione dei Nodi e Scrittura delle Coordinate}
-Una volta preparato l'ambiente, il passo successivo è stato generare i nodi veri e propri. Abbiamo scelto di scorrere la griglia iterando sulle righe e sulle colonne in modo naturale. Per ogni nodo calcoliamo il suo ID univoco (tramite la funzione \texttt{calcola\_id\_nodo}) e determiniamo le coordinate spaziali normalizzate nell'intervallo $(0, 1)$, scrivendo subito il risultato su disco per risparmiare memoria.
+Una volta preparato l'ambiente, il passo successivo è stato generare i nodi veri e propri. Ho scelto di scorrere la griglia iterando sulle righe e sulle colonne in modo naturale. Per ogni nodo calcolo il suo ID univoco (tramite la funzione \texttt{calcola\_id\_nodo}) e determino le coordinate spaziali normalizzate nell'intervallo $(0, 1)$, scrivendo subito il risultato su disco per risparmiare memoria.
 \begin{lstlisting}[language=C++]
     // --- Generazione Nodi ---
     auto inizio_coordinate = high_resolution_clock::now();
@@ -380,10 +412,10 @@ Una volta preparato l'ambiente, il passo successivo è stato generare i nodi ver
     file_coordinate.close();
     auto fine_coordinate = high_resolution_clock::now();
 \end{lstlisting}
-Abbiamo forzato l'uso di \texttt{setprecision(8)} per essere sicuri che i valori in virgola mobile non perdessero precisione. Questo dettaglio si è rivelato fondamentale in seguito per calcolare in modo corretto la mediana geometrica nel modulo di partizionamento.
+Ho forzato l'uso di \texttt{setprecision(8)} per essere sicuro che i valori in virgola mobile non perdessero precisione. Questo dettaglio si è rivelato fondamentale in seguito per calcolare in modo corretto la mediana geometrica nel modulo di partizionamento.
 
 \subsubsection*{3. Costruzione del Grafo di Connessione}
-A questo punto avevamo i nodi geometrici, ma ci serviva una struttura logica che rappresentasse i legami fisici della griglia. Abbiamo perciò optato per una lista di adiacenza bidirezionale.
+A questo punto avevo i nodi geometrici, ma mi serviva una struttura logica che rappresentasse i legami fisici della griglia. Ho perciò optato per una lista di adiacenza bidirezionale.
 \begin{lstlisting}[language=C++]
     // --- Generazione Grafo di Connessione ---
     auto inizio_connettivita = high_resolution_clock::now();
@@ -408,10 +440,10 @@ A questo punto avevamo i nodi geometrici, ma ci serviva una struttura logica che
         }
     }
 \end{lstlisting}
-Per evitare che il vettore \texttt{lista\_adiacenza} venisse continuamente ridimensionato (rallentando pesantemente l'esecuzione), abbiamo pre-allocato la memoria usando \texttt{reserve(4)}, dal momento che sapevamo in anticipo che i nodi avrebbero avuto al massimo 4 vicini. Nel ciclo principale, per evitare controlli ridondanti, abbiamo scelto un approccio costruttivo ``in avanti'': colleghiamo il nodo corrente soltanto con il suo vicino in alto e con quello a destra, aggiornando le due direzioni contemporaneamente.
+Per evitare che il vettore \texttt{lista\_adiacenza} venisse continuamente ridimensionato (rallentando pesantemente l'esecuzione), ho pre-allocato la memoria usando \texttt{reserve(4)}, dal momento che sapevo in anticipo che i nodi avrebbero avuto al massimo 4 vicini. Nel ciclo principale, per evitare controlli ridondanti, ho scelto un approccio costruttivo ``in avanti'': collego il nodo corrente soltanto con il suo vicino in alto e con quello a destra, aggiornando le due direzioni contemporaneamente.
 
 \subsubsection*{4. Scrittura del Grafo ed Estrazione degli Archi}
-Infine, dovevamo convertire questa struttura in memoria in un formato testuale semplice. Scorrendo la lista di adiacenza, abbiamo imposto una basilare regola di disuguaglianza ($u < v$) in modo da essere certi di scrivere ogni arco non orientato esattamente una volta sola.
+Infine, dovevo convertire questa struttura in memoria in un formato testuale semplice. Scorrendo la lista di adiacenza, ho imposto una basilare regola di disuguaglianza ($u < v$) in modo da essere certo di scrivere ogni arco non orientato esattamente una volta sola.
 \begin{lstlisting}[language=C++]
     ofstream file_connettivita(CARTELLA_OUTPUT + "connectivity.txt");
     for (int u = 0; u < numero_nodi; ++u) {
@@ -426,7 +458,7 @@ Infine, dovevamo convertire questa struttura in memoria in un formato testuale s
 \end{lstlisting}
 
 \subsubsection*{5. Benchmark e Conclusione}
-Per accertarci che le nostre scelte implementative fossero davvero efficienti, abbiamo integrato fin dall'inizio un sistema di \textit{profiling} interno tramite la libreria \texttt{<chrono>}, per misurare i tempi effettivi di processamento.
+Per accertarmi che le mie scelte implementative fossero davvero efficienti, ho integrato fin dall'inizio un sistema di \textit{profiling} interno tramite la libreria \texttt{<chrono>}, per misurare i tempi effettivi di processamento.
 \begin{lstlisting}[language=C++]
     // Benchmark delle performance temporali
     duration<double, milli> tempo_coordinate = 
@@ -442,103 +474,179 @@ Per accertarci che le nostre scelte implementative fossero davvero efficienti, a
     return 0;
 }
 \end{lstlisting}
-Questa struttura dal design lineare ci ha fornito una base solida e scattante, regalandoci gli input puliti e minimali necessari per iniziare lo sviluppo del \texttt{task2\_reorder.cpp}.
+Questa struttura dal design lineare mi ha fornito una base solida e scattante, regalandomi gli input puliti e minimali necessari per iniziare lo sviluppo del \texttt{task2\_reorder.cpp}.
 
 % ---- Modulo 2 -----------------------------------------------
 \subsection*{Modulo 2 — \texttt{task2\_reorder.cpp}: nested dissection}
 
-\textbf{Input.}
-\begin{itemize}
-  \item \texttt{coords.txt} e \texttt{connectivity.txt} prodotti dal Modulo 1;
-  \item intero $N$ (da riga di comando o dedotto dal file).
-\end{itemize}
+Il Modulo 2 costituisce il cuore algoritmico del progetto. Il suo compito è calcolare una permutazione ottimizzata dei nodi del grafo tramite l'euristica della \textit{nested dissection}, al fine di minimizzare il fill-in durante la fattorizzazione di Cholesky. Di seguito descrivo nel dettaglio le mie scelte architetturali e i passi implementativi.
 
-\textbf{Output.} File \texttt{ordering.txt} con $N^2$ righe, ciascuna della forma\\
-\texttt{new\_id\quad old\_id},\quad dove \texttt{new\_id} $\in\{0,\dots,N^2-1\}$ è
-la posizione assegnata dalla nested dissection all'nodo di identificatore originale
-\texttt{old\_id}.
+\subsubsection*{Formalizzazione Matematica del Partizionamento}
+Da un punto di vista formale, l'algoritmo di nested dissection opera sul grafo $G = (V,E)$. L'obiettivo è individuare un separatore $V_S \subset V$ di cardinalità minima che disconnetta il grafo in due sottografi $G_1 = (V_1, E_1)$ e $G_2 = (V_2, E_2)$ approssimativamente della stessa dimensione, tali per cui non vi siano spigoli tra $V_1$ e $V_2$.
+Dato un sottoinsieme di nodi $S \subseteq V$, la procedura seleziona iterativamente un asse di taglio (alternando $x$ e $y$). Selezionato, ad esempio, l'asse $x$, si individua la coordinata mediana $\hat{x}$ e si definiscono:
+\begin{align*}
+  V_1 &= \{ (x_i, y_j) \in S \mid x_i < \hat{x} \} \\
+  V_2 &= \{ (x_i, y_j) \in S \mid x_i > \hat{x} \} \\
+  V_S &= \{ (x_i, y_j) \in S \mid x_i = \hat{x} \}
+\end{align*}
+I nodi in $V_1$ vengono enumerati per primi, seguiti dai nodi in $V_2$, ed infine dai nodi del separatore $V_S$, applicando la medesima logica ricorsivamente su $V_1$ e $V_2$.
 
-\textbf{Funzionalità richieste.}
-\begin{itemize}
-  \item Lettura del grafo di adiacenza con coordinate geometriche.
-  \item Implementazione iterativa della nested dissection (basata su uno stack esplicito in memoria heap per prevenire stack overflow su griglie di grandi dimensioni): dato un sottografo
-        indotto da un insieme $S \subseteq V$ con estensione geometrica $[x_{\min},x_{\max}]\times[y_{\min},y_{\max}]$:
-        \begin{enumerate}
-          \item scegliere l'asse di taglio (prima $x$, poi $y$ in alternanza);
-          \item individuare il separatore $V_S\subset S$ come l'insieme dei nodi
-                con coordinata sull'asse di taglio pari alla mediana;
-          \item processare in modo iterativo prima $V_1 = S\setminus(V_2\cup V_S)$
-                (sottodominio ``inferiore''), poi $V_2$ (sottodominio ``superiore''),
-                aggiungendo infine $V_S$ (separatore) all'ordinamento;
-        \end{enumerate}
-  \item Misurazione del tempo di esecuzione dell'algoritmo tramite \texttt{<chrono>}.
-  \item Scrittura della permutazione risultante in \texttt{ordering.txt}.
-\end{itemize}
+\newpage
+\subsubsection*{1. Lettura dei Dati e Definizione delle Strutture Dati}
+Come prima operazione, avevo la necessità di caricare in memoria i dati geometrici generati dal Modulo 1. Poiché la logica si basa sulle sole coordinate, ho definito una struttura compatta \texttt{Node} e ho caricato l'intero contenuto del file \texttt{coords.txt} in un vettore. Ho poi implementato la lettura formale del file \texttt{connectivity.txt} per aderire ai requisiti rigorosi di progetto.
+\begin{lstlisting}[language=C++]
+struct Node {
+    int id;
+    int i;
+    int j;
+    double x;
+    double y;
+};
 
-\textbf{Strutture dati.}
-\begin{itemize}
-  \item Lista di adiacenza \texttt{std::vector<std::vector<int>>} con coordinate associate.
-  \item Struttura dati \texttt{std::stack} per gestire in modo iterativo i sottoproblemi da elaborare (emulando lo stack di chiamate).
-  \item Array \texttt{perm[]} di dimensione $N^2$ che accumula la permutazione finale.
-\end{itemize}
+// ...
+vector<Node> nodes;
+int n, i, j;
+double x, y;
+while (coords_file >> n >> i >> j >> x >> y) {
+    nodes.push_back({n, i, j, x, y});
+}
+\end{lstlisting}
 
-\textbf{Complessità attesa.} La nested dissection su griglia $N\times N$ richiede
-$O(N^2\log N)$ operazioni; la scrittura del file è $O(N^2)$.
+\subsubsection*{2. Implementazione Iterativa con Stack Esplicito}
+L'algoritmo di nested dissection ha intrinsecamente una natura ricorsiva. Tuttavia, per griglie molto grandi ($N \gg 1000$), un approccio basato sulle normali chiamate a funzione rischiava di esaurire lo spazio dello stack, provocando crash indesiderati (\textit{stack overflow}). Ho deciso quindi di convertire la logica in una forma puramente iterativa, impiegando uno \texttt{std::stack} esplicito allocato nell'heap, che mi ha garantito grande stabilità.
+\begin{lstlisting}[language=C++]
+struct StackItem {
+    vector<Node> S;   // sottoinsieme di nodi da processare
+    int axis;         // asse di taglio corrente (0=X, 1=Y)
+    bool separatore;  // flag: indica se l'item e' un separatore finale
+};
 
-\textbf{Dipendenze.} Legge i file prodotti dal Modulo 1; produce \texttt{ordering.txt}
-usato dal Modulo 3.
+void nested_dissection(const vector<Node>& nodi_iniziali, int axis_iniziale, vector<int>& ordering) {
+    stack<StackItem> stk;
+    stk.push({nodi_iniziali, axis_iniziale, false});
+    
+    while (!stk.empty()) {
+        StackItem item = move(stk.top());
+        stk.pop();
+        // ...
+\end{lstlisting}
+
+\subsubsection*{3. Estrazione del Separatore Geometrico}
+All'interno del ciclo principale, procedo all'estrazione delle coordinate minime e massime per calcolare la mediana. Una volta determinato il valore medio, suddivido i nodi nei tre insiemi $V_1, V_2, V_S$.
+La vera accortezza risiede nell'ordine di inserimento nello stack: dovendo processare per primo l'insieme $V_1$, esso deve essere inserito per ultimo (\textit{Last-In, First-Out}). 
+\begin{lstlisting}[language=C++]
+        // Calcolo coordinata mediana
+        int mid_val = (min_val + max_val) / 2;
+
+        vector<Node> V1, V2, VS;
+        for (const auto& node : item.S) {
+            int val = (item.axis == 0) ? node.i : node.j;
+            if (val < mid_val)      V1.push_back(node);
+            else if (val > mid_val) V2.push_back(node);
+            else                    VS.push_back(node);
+        }
+
+        // Push invertito per eseguire V1 -> V2 -> VS
+        stk.push({VS, item.axis,      true});
+        stk.push({V2, 1 - item.axis,  false});
+        stk.push({V1, 1 - item.axis,  false});
+    }
+}
+\end{lstlisting}
+
+\subsubsection*{4. Salvataggio della Permutazione e Benchmark}
+Al termine del processo iterativo, l'ordinamento è pronto e viene salvato sul vettore. Per calcolare il tempo di esecuzione, ho utilizzato la libreria \texttt{<chrono>}, ripetendo un pattern di misurazione simile a quello che ho impiegato nel Modulo 1. L'output finale viene salvato nel file \texttt{ordering.txt} secondo un formato che fa corrispondere la nuova posizione (l'indice) al vecchio identificatore logico del nodo.
+\begin{lstlisting}[language=C++]
+    // ... avvio timer chrono ...
+    nested_dissection(nodes, 0, ordering);
+    // ... arresto timer chrono ...
+    
+    ofstream out_file(OUTPUT_DIR + "ordering.txt");
+    for (size_t k = 0; k < ordering.size(); ++k) {
+        out_file << k << " " << ordering[k] << "\n";
+    }
+    out_file.close();
+\end{lstlisting}
+Questo secondo modulo risulta così essere robusto da un punto di vista algoritmico, limitando l'uso della memoria e offrendo un tempo asintotico di esecuzione atteso pari a $O(N^2 \log N)$.
 
 % ---- Modulo 3 -----------------------------------------------
 \subsection*{Modulo 3 — \texttt{task3\_assemble.cpp}: assemblaggio del sistema lineare}
 
-\textbf{Input.}
-\begin{itemize}
-  \item Intero $N$ (da riga di comando).
-  \item Flag opzionale \texttt{--reorder} che indica se usare l'ordinamento da
-        \texttt{ordering.txt} anziché quello naturale.
-  \item File \texttt{coords.txt} (per le coordinate dei nodi e il termine sorgente
-        $f$) e, se richiesto, \texttt{ordering.txt}.
-\end{itemize}
+Il Modulo 3 è incaricato di costruire il sistema lineare che approssima l'equazione differenziale. Ho progettato questo task per accettare sia l'ordinamento naturale della griglia, sia quello ottimizzato prodotto dal Modulo 2 tramite l'apposito flag \texttt{--reorder}.
 
-\textbf{Output.}
-\begin{itemize}
-  \item \texttt{A.txt} — elenco delle entrate non nulle della matrice: una riga per entrata
-        nella forma \texttt{i\quad j\quad A[i,j]} rispetto all'ordinamento scelto;
-  \item \texttt{rhs.txt} — vettore dei termini noti: una riga per entrata contenente
-        il valore $b_k$, con le righe nello stesso ordine di \texttt{A.txt}.
-\end{itemize}
+\subsubsection*{Formalizzazione Matematica del Sistema Lineare}
+Dal punto di vista matematico, lo scopo è assemblare il sistema $A u = b$. L'equazione del calore stazionaria, $\kappa \nabla^2 u + f = 0$, viene approssimata utilizzando lo stencil alle differenze finite a 5 punti. Per ogni nodo $k$ con coordinate $(x_{i(k)}, y_{j(k)})$ e considerando il passo spaziale $h = \frac{1}{N+1}$, i coefficienti della matrice sparsa $A$ risultano:
+\begin{align*}
+  A_{k,k} &= -\frac{4\kappa}{h^2} \\
+  A_{k,k'} &= +\frac{\kappa}{h^2} \quad \text{per ogni nodo interno adiacente } k'
+\end{align*}
+Il termine noto viene posto pari a $b_k = -f(x_{i(k)}, y_{j(k)})$. Nel caso in cui il nodo adiacente $k'$ cada sul bordo del dominio, il corrispondente valore è fissato a zero (condizioni di Dirichlet omogenee), perciò il suo contributo viene spostato al termine noto $b_k$ che, in questo caso specifico, non subisce alterazioni numeriche.
 
-\textbf{Funzionalità richieste.}
-\begin{itemize}
-  \item Calcolo del passo $h = 1/(N+1)$ e del coefficiente $\kappa = 0.01$.
-  \item Per ogni nodo interno $k$ (nel nuovo ordinamento): inserimento dell'entrata
-        diagonale $A[k,k] = -4\kappa/h^2$ e delle entrate fuori diagonale
-        $A[k,k']=+\kappa/h^2$ per ogni vicino $k'$; se un vicino $k'$ cade sul bordo,
-        l'entrata corrispondente sparirà dalla matrice e il suo valore ($u_0 = 0$) andrà
-        portato al secondo membro $b_k$. Anche se l'effetto numerico è nullo, la logica deve
-        essere robusta per condizioni non omogenee.
-  \item Valutazione del termine sorgente: $b_k = -f(x_{i(k)}, y_{j(k)})$ con
-        $f(x,y) = e^{-10(x^2+y^2)}$.
-  \item Applicazione della permutazione (se richiesta) per tradurre gli indici dal
-        sistema naturale al sistema riordinato.
-\end{itemize}
+\newpage
+\subsubsection*{1. Gestione degli Argomenti e Lettura Coordinate}
+Per garantire robustezza, la prima operazione che eseguo è il controllo degli argomenti da riga di comando per l'attivazione opzionale della nested dissection. Successivamente, leggo il file \texttt{coords.txt}, allocando uno spazio predefinito per le coordinate dei nodi e assicurandomi che il numero di entrate coincida con $N^2$.
+\begin{lstlisting}[language=C++]
+    int N = stoi(argv[1]);
+    bool usa_reorder = false;
+    if (argc == 3 && string(argv[2]) == "--reorder") {
+        usa_reorder = true;
+    }
+    
+    // ... Lettura di coords.txt ...
+    while (file_coords >> id >> ri >> rj >> rx >> ry) {
+        coords[id] = {id, ri, rj, rx, ry};
+        contatore_nodi++;
+    }
+\end{lstlisting}
 
-\textbf{Invariante.} La matrice prodotta è simmetrica: ogni coppia $(i,j)$ con $i\neq j$
-compare due volte in \texttt{A.txt} con lo stesso valore.
+\subsubsection*{2. Lettura della Permutazione (Opzionale)}
+Se richiesto, carico il file \texttt{ordering.txt} e costruisco le mappe di permutazione diretta e inversa, fondamentali per mappare la topologia logica del problema fisico all'interno della struttura riordinata della matrice in tempo costante $O(1)$. Se l'ordinamento richiesto è quello naturale, istanzio semplicemente un vettore identità.
+\begin{lstlisting}[language=C++]
+    vector<int> perm(num_nodi);
+    vector<int> inv_perm(num_nodi);
 
-\textbf{Strutture dati.}
-\begin{itemize}
-  \item Array \texttt{perm[]} per la permutazione; \texttt{inv\_perm[]} per l'inversa
-        (\texttt{inv\_perm[old\_id] = new\_id}), fondamentale per mappare l'ordinamento in tempo $O(N^2)$.
-  \item Tripli \texttt{(i,j,val)} accumulati in un \texttt{std::vector} prima della scrittura
-        (anche qui, usare \texttt{reserve()} conoscendo la numerosità attesa).
-\end{itemize}
+    if (usa_reorder) {
+        // ... Lettura new_id e old_id da file ...
+        perm[new_id]     = old_id;
+        inv_perm[old_id] = new_id;
+    } else {
+        for (int k = 0; k < num_nodi; ++k) {
+            perm[k]     = k;
+            inv_perm[k] = k;
+        }
+    }
+\end{lstlisting}
 
-\textbf{Complessità attesa.} Assemblaggio in $O(N^2)$ (al più 5 entrate per nodo);
-scrittura in $O(\text{nnz}) = O(N^2)$.
+\subsubsection*{3. Assemblaggio dei Coefficienti dello Stencil}
+La fase di assemblaggio vera e propria itera sui nodi in funzione del loro nuovo indice $k$. Per ogni nodo calcolo l'entrata diagonale e applico lo stencil esplorando i 4 vicini topologici (sinistra, destra, basso, alto). Nel calcolo uso i coefficienti costanti pre-calcolati dipendenti da $\kappa$ e $h$. Per minimizzare le allocazioni, memorizzo le entrate non nulle in un vettore di \texttt{Triplet} pre-allocato (\texttt{reserve}).
+\begin{lstlisting}[language=C++]
+    for (int k = 0; k < num_nodi; ++k) {
+        int old_id = perm[k];
+        // ... estrazione coordinate (ri, rj) ...
+        
+        triplets.push_back({k, k, coeff_diag});
+        rhs[k] = -f_sorgente(x, y);
 
-\textbf{Dipendenze.} Legge \texttt{coords.txt} e opzionalmente \texttt{ordering.txt};
-produce i file letti dal Modulo 4.
+        for (int d = 0; d < 4; ++d) {
+            int ni = ri + di[d];
+            int nj = rj + dj[d];
+
+            if (ni < 1 || ni > N || nj < 1 || nj > N) {
+                // Condizione di Dirichlet sul bordo
+                rhs[k] -= coeff_fuori_diag * 0.0;
+            } else {
+                // Nodo interno riordinato
+                int old_id_vicino = id_naturale(ni, nj, N);
+                int k_vicino      = inv_perm[old_id_vicino];
+                triplets.push_back({k, k_vicino, coeff_fuori_diag});
+            }
+        }
+    }
+\end{lstlisting}
+
+\subsubsection*{4. Salvataggio della Matrice sparsa e del Termine Noto}
+Infine, salvo i risultati esportando il vettore termine noto e i tripli iterando linearmente sulla collezione. Ho applicato la modalità di scrittura formattata \texttt{fixed} con precisione decimale di 10 cifre per assicurare la conservazione dei coefficienti numerici in virgola mobile ad alta precisione.
+L'algoritmo assembla il tutto in un tempo di elaborazione lineare $O(N^2)$, un aspetto critico per scalare facilmente il codice a reti con un gran numero di incognite.
 
 % ---- Modulo 4 -----------------------------------------------
 \subsection*{Modulo 4 — \texttt{solver.ipynb}: soluzione e analisi}
