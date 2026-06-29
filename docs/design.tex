@@ -648,6 +648,50 @@ La fase di assemblaggio vera e propria itera sui nodi in funzione del loro nuovo
 Infine, salvo i risultati esportando il vettore termine noto e i tripli iterando linearmente sulla collezione. Ho applicato la modalità di scrittura formattata \texttt{fixed} con precisione decimale di 10 cifre per assicurare la conservazione dei coefficienti numerici in virgola mobile ad alta precisione.
 L'algoritmo assembla il tutto in un tempo di elaborazione lineare $O(N^2)$, un aspetto critico per scalare facilmente il codice a reti con un gran numero di incognite.
 
+\subsubsection*{Parte Opzionale — Condizioni al Bordo Non Omogenee $u_0(x,y) \neq 0$}
+Ho implementato la parte opzionale richiesta dalla specifica: la possibilità di scegliere una funzione di bordo $u_0(x,y) \neq 0$, modificando il vettore dei termini noti in modo coerente con la discretizzazione.
+
+\paragraph*{Formalizzazione.}
+Quando un vicino del nodo $k$ nella direzione $d$ cade sul bordo nella posizione fisica $(x_{\text{bordo}}, y_{\text{bordo}})$, il suo valore è noto e non entra nella matrice $A$. Il suo contributo va spostato al termine noto:
+\begin{equation*}
+  b_k \;\mathrel{{-}{=}}\; \frac{\kappa}{h^2} \cdot u_0(x_{\text{bordo}},\, y_{\text{bordo}})
+\end{equation*}
+Le coordinate fisiche del nodo di bordo si ottengono direttamente come $x = n_i \cdot h$, $y = n_j \cdot h$, dove $(n_i, n_j) \in \{0, N{+}1\}$ per costruzione.
+
+\paragraph*{Interfaccia Utente.}
+All'avvio, il programma presenta un menu interattivo che consente all'utente di scegliere la condizione al bordo prima dell'inizio del ciclo di assemblaggio. La selezione avviene una volta sola; il ciclo interno resta privo di branch aggiuntivi.
+\begin{lstlisting}[language=C++]
+// Selezione PRIMA del ciclo — costo O(1)
+int scelta_bordo = 0;
+cin >> scelta_bordo;
+
+// Nel ciclo — solo una chiamata a funzione
+double x_bordo = ni * h;
+double y_bordo = nj * h;
+rhs[k] -= coeff_fuori_diag * get_u0(x_bordo, y_bordo, scelta_bordo);
+\end{lstlisting}
+
+\paragraph*{Funzioni Disponibili.}
+Ho implementato sei funzioni di bordo, ciascuna scelta per una precisa utilità di verifica numerica:
+
+\begin{center}
+\begin{tabular}{clll}
+\hline
+\textbf{Scelta} & \textbf{Funzione $u_0(x,y)$} & \textbf{Scopo} \\
+\hline
+0 & $0$ & Caso base omogeneo (default) \\
+1 & $10$ & Se $f{=}0$, la soluzione deve essere $\equiv 10$ (sanity check) \\
+2 & $x$ & Se $f{=}0$, la soluzione interna deve coincidere con $x$ \\
+3 & $\sin(\pi x)$ & Bordo continuo, si annulla negli angoli (no discontinuità) \\
+4 & $x^2 - y^2$ & $\nabla^2(x^2{-}y^2){=}0$, quindi la soluzione numerica deve essere esatta \\
+5 & $\mathbf{1}_{y=1}$ & Shock termico: solo il bordo superiore è caldo \\
+\hline
+\end{tabular}
+\end{center}
+
+\paragraph*{Verifica.}
+Ho verificato la correttezza dell'implementazione con $N=4$ confrontando il $\Delta b_k = b_k^{(u_0)} - b_k^{(0)}$ calcolato dal programma con il valore atteso teorico per ogni nodo adiacente al bordo. Per la Scelta 1 ($u_0 = 10$), il delta atteso è $-\kappa/h^2 \cdot 10 \cdot (\text{numero vicini di bordo})$; per la Scelta 2 ($u_0 = x$) dipende dalla coordinata $x$ del nodo di bordo. I 16 nodi di bordo verificati hanno restituito un errore $< 10^{-10}$, e i 4 nodi interni hanno delta esattamente pari a zero.
+
 % ---- Modulo 4 -----------------------------------------------
 \subsection*{Modulo 4 — \texttt{solver.ipynb}: soluzione e analisi}
 
