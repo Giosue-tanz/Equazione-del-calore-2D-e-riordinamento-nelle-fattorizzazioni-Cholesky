@@ -47,6 +47,30 @@ inline double f_sorgente(double x, double y) {
     return exp(-10.0 * (x * x + y * y));
 }
 
+// ============================================================
+//  Parte Opzionale — Condizioni al bordo non omogenee u0(x,y)
+//
+//  Scelta 0: u0 = 0              (omogenee, default)
+//  Scelta 1: u0 = 10.0           (costante — sanity check)
+//  Scelta 2: u0 = x              (gradiente lineare)
+//  Scelta 3: u0 = sin(pi*x)      (sinusoidale continua)
+//  Scelta 4: u0 = x^2 - y^2     (armonica, Laplaciano = 0)
+//  Scelta 5: u0 = 1 se y=1, 0   (shock termico bordo superiore)
+// ============================================================
+double get_u0(double x, double y, int scelta) {
+    switch (scelta) {
+        case 0: return 0.0;
+        case 1: return 10.0;
+        case 2: return x;
+        case 3: return sin(M_PI * x);
+        case 4: return x * x - y * y;
+        case 5: return (y >= 1.0 - 1e-10) ? 1.0 : 0.0;
+        default:
+            cerr << "Errore: scelta bordo non valida (" << scelta << ")." << endl;
+            exit(1);
+    }
+}
+
 // Calcola l'ID naturale del nodo (i, j) con i,j in [1..N]
 // ID = (i-1)*N + (j-1)  => riga maggiore, colonna minore
 inline int id_naturale(int i, int j, int N) {
@@ -92,6 +116,27 @@ int main(int argc, char* argv[]) {
     double h = 1.0 / (N + 1);
     double coeff_diag      = -4.0 * KAPPA / (h * h);   // entrata diagonale
     double coeff_fuori_diag = KAPPA / (h * h);          // entrata fuori diagonale
+
+    // --------------------------------------------------------
+    // Menu interattivo: scelta della condizione al bordo
+    // --------------------------------------------------------
+    const string nomi_bordo[] = {
+        "Omogenee          u0(x,y) = 0",
+        "Costante          u0(x,y) = 10.0",
+        "Gradiente lineare u0(x,y) = x",
+        "Sinusoidale       u0(x,y) = sin(pi*x)",
+        "Armonica          u0(x,y) = x^2 - y^2",
+        "Shock termico     u0(x,y) = 1 se y=1, 0 altrove"
+    };
+    int scelta_bordo = 0;
+    cout << "\nCondizioni al bordo di Dirichlet:" << endl;
+    for (int i = 0; i <= 5; ++i)
+        cout << "  [" << i << "] " << nomi_bordo[i] << endl;
+    cout << "Scelta [0-5]: ";
+    if (!(cin >> scelta_bordo) || scelta_bordo < 0 || scelta_bordo > 5) {
+        cerr << "Errore: inserire un valore intero tra 0 e 5." << endl;
+        return 1;
+    }
 
     mkdir(OUTPUT_DIR.c_str(), 0755);
 
@@ -224,12 +269,12 @@ int main(int argc, char* argv[]) {
             int nj = rj + dj[d];
 
             if (ni < 1 || ni > N || nj < 1 || nj > N) {
-                // Il vicino cade sul bordo: u_bordo = 0 per Dirichlet omogeneo.
-                // Il contributo kappa/h^2 * u_bordo = 0 va al secondo membro.
-                // Con u_bordo = 0 l'effetto numerico e' nullo, ma la logica e' robusta
-                // per condizioni non omogenee future.
-                double u_bordo = 0.0;
-                rhs[k] -= coeff_fuori_diag * u_bordo;  // = 0, ma corretto concettualmente
+                // Il vicino cade sul bordo: il suo valore e' noto (condizione di Dirichlet).
+                // Non entra nella matrice A, ma contribuisce al termine noto:
+                //   rhs[k] -= (kappa/h^2) * u0(x_bordo, y_bordo)
+                double x_bordo = ni * h;
+                double y_bordo = nj * h;
+                rhs[k] -= coeff_fuori_diag * get_u0(x_bordo, y_bordo, scelta_bordo);
             } else {
                 // Vicino interno: calcola il suo old_id, poi il new_id
                 int old_id_vicino = id_naturale(ni, nj, N);
@@ -290,6 +335,7 @@ int main(int argc, char* argv[]) {
     cout << "  Passo h            : " << h << endl;
     cout << "  kappa              : " << KAPPA << endl;
     cout << "  Ordinamento        : " << (usa_reorder ? "Nested Dissection (--reorder)" : "Naturale") << endl;
+    cout << "  Condizione bordo   : [" << scelta_bordo << "] " << nomi_bordo[scelta_bordo] << endl;
     cout << "  Entrate in A.txt   : " << triplets.size()
          << "  (attese: " << num_nodi + 4LL * num_nodi << " max)" << endl;
     cout << "\n=== TEMPI DI ESECUZIONE (BENCHMARK) ===" << endl;
