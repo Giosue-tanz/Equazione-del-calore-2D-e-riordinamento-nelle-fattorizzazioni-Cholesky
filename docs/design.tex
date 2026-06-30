@@ -1,5 +1,5 @@
 % ============================================================
-%  Documento di Progetto — Informatica con Laboratorio 6CFU
+%  Documento di Progetto - Informatica con Laboratorio 6CFU
 %  Equazione del Calore 2D e Riordinamento nelle
 %  Fattorizzazioni Cholesky
 %
@@ -41,6 +41,7 @@
 
 % ---- Float e TikZ -----------------------------------------
 \usepackage{float}
+\usepackage{graphicx}
 \usepackage{tikz}
 \usetikzlibrary{shapes.geometric, arrows.meta, positioning, fit, backgrounds}
 
@@ -329,7 +330,7 @@ per ciascuno si indicano input, output, funzionalità richieste, strutture dati 
 complessità attesa.
 
 % ---- Modulo 1 -----------------------------------------------
-\subsection*{Modulo 1 — \texttt{task1\_grid.cpp}: generazione della griglia e del grafo}
+\subsection*{Modulo 1 - \texttt{task1\_grid.cpp}: generazione della griglia e del grafo}
 
 Il Modulo 1 è responsabile della creazione della struttura geometrica del dominio e del relativo grafo di adiacenza. Per realizzarlo, ho deciso di scriverlo interamente in C++17 ponendo particolare attenzione alla leggibilità e all'efficienza. Di seguito ripercorro il ragionamento logico che mi ha guidato nella costruzione di questo modulo, passo dopo passo.
 
@@ -477,7 +478,7 @@ Per accertarmi che le mie scelte implementative fossero davvero efficienti, ho i
 Questa struttura dal design lineare mi ha fornito una base solida e scattante, regalandomi gli input puliti e minimali necessari per iniziare lo sviluppo del \texttt{task2\_reorder.cpp}.
 
 % ---- Modulo 2 -----------------------------------------------
-\subsection*{Modulo 2 — \texttt{task2\_reorder.cpp}: nested dissection}
+\subsection*{Modulo 2 - \texttt{task2\_reorder.cpp}: nested dissection}
 
 Il Modulo 2 costituisce il cuore algoritmico del progetto. Il suo compito è calcolare una permutazione ottimizzata dei nodi del grafo tramite l'euristica della \textit{nested dissection}, al fine di minimizzare il fill-in durante la fattorizzazione di Cholesky. Di seguito descrivo nel dettaglio le mie scelte architetturali e i passi implementativi.
 
@@ -570,7 +571,7 @@ Al termine del processo iterativo, l'ordinamento è pronto e viene salvato sul v
 Questo secondo modulo risulta così essere robusto da un punto di vista algoritmico, limitando l'uso della memoria e offrendo un tempo asintotico di esecuzione atteso pari a $O(N^2 \log N)$.
 
 % ---- Modulo 3 -----------------------------------------------
-\subsection*{Modulo 3 — \texttt{task3\_assemble.cpp}: assemblaggio del sistema lineare}
+\subsection*{Modulo 3 - \texttt{task3\_assemble.cpp}: assemblaggio del sistema lineare}
 
 Il Modulo 3 è incaricato di costruire il sistema lineare che approssima l'equazione differenziale. Ho progettato questo task per accettare sia l'ordinamento naturale della griglia, sia quello ottimizzato prodotto dal Modulo 2 tramite l'apposito flag \texttt{--reorder}.
 
@@ -648,7 +649,7 @@ La fase di assemblaggio vera e propria itera sui nodi in funzione del loro nuovo
 Infine, salvo i risultati esportando il vettore termine noto e i tripli iterando linearmente sulla collezione. Ho applicato la modalità di scrittura formattata \texttt{fixed} con precisione decimale di 10 cifre per assicurare la conservazione dei coefficienti numerici in virgola mobile ad alta precisione.
 L'algoritmo assembla il tutto in un tempo di elaborazione lineare $O(N^2)$, un aspetto critico per scalare facilmente il codice a reti con un gran numero di incognite.
 
-\subsubsection*{Parte Opzionale — Condizioni al Bordo Non Omogenee $u_0(x,y) \neq 0$}
+\subsubsection*{Parte Opzionale - Condizioni al Bordo Non Omogenee $u_0(x,y) \neq 0$}
 Ho implementato la parte opzionale richiesta dalla specifica: la possibilità di scegliere una funzione di bordo $u_0(x,y) \neq 0$, modificando il vettore dei termini noti in modo coerente con la discretizzazione.
 
 \paragraph*{Formalizzazione.}
@@ -661,11 +662,11 @@ Le coordinate fisiche del nodo di bordo si ottengono direttamente come $x = n_i 
 \paragraph*{Interfaccia Utente.}
 All'avvio, il programma presenta un menu interattivo che consente all'utente di scegliere la condizione al bordo prima dell'inizio del ciclo di assemblaggio. La selezione avviene una volta sola; il ciclo interno resta privo di branch aggiuntivi.
 \begin{lstlisting}[language=C++]
-// Selezione PRIMA del ciclo — costo O(1)
+// Selezione PRIMA del ciclo - costo O(1)
 int scelta_bordo = 0;
 cin >> scelta_bordo;
 
-// Nel ciclo — solo una chiamata a funzione
+// Nel ciclo - solo una chiamata a funzione
 double x_bordo = ni * h;
 double y_bordo = nj * h;
 rhs[k] -= coeff_fuori_diag * get_u0(x_bordo, y_bordo, scelta_bordo);
@@ -693,7 +694,7 @@ Ho implementato sei funzioni di bordo, ciascuna scelta per una precisa utilità 
 Ho verificato la correttezza dell'implementazione con $N=4$ confrontando il $\Delta b_k = b_k^{(u_0)} - b_k^{(0)}$ calcolato dal programma con il valore atteso teorico per ogni nodo adiacente al bordo. Per la Scelta 1 ($u_0 = 10$), il delta atteso è $-\kappa/h^2 \cdot 10 \cdot (\text{numero vicini di bordo})$; per la Scelta 2 ($u_0 = x$) dipende dalla coordinata $x$ del nodo di bordo. I 16 nodi di bordo verificati hanno restituito un errore $< 10^{-10}$, e i 4 nodi interni hanno delta esattamente pari a zero.
 
 % ---- Modulo 4 -----------------------------------------------
-\subsection*{Modulo 4 — \texttt{solver.ipynb}: soluzione e analisi}
+\subsection*{Modulo 4 - \texttt{solver.ipynb}: soluzione e analisi}
 
 \textbf{Input.}
 \begin{itemize}
@@ -720,57 +721,58 @@ Ho verificato la correttezza dell'implementazione con $N=4$ confrontando il $\De
   \item Soluzione del sistema lineare tramite \texttt{scipy.sparse.linalg.spsolve\_triangular}.
   \item Misurazione del tempo di esecuzione (con \texttt{time.perf\_counter}) per
         ciascun valore di $N$ e per entrambe le strategie di ordinamento.
-  \item Confronto del fill-in: conteggio di \texttt{nnz(L)} per ordinamento naturale
-        e nested dissection.
 \end{itemize}
+
+\textbf{Logica e scelte implementative.}
+La risoluzione del sistema è stata sviluppata interamente all'interno di un Notebook Jupyter (\texttt{solver.ipynb}), che orchestra sia la fattorizzazione di Cholesky sia i test sperimentali.
+
+Ho deciso di organizzare il notebook in sezioni modulari, partendo dal parsing dell'input: la lettura dei file generati in C++ avviene riga per riga per costruire liste di indici (righe e colonne) e valori, che vengono poi iniettate in un oggetto \texttt{coo\_matrix} di \texttt{scipy.sparse}. Questa scelta garantisce un'efficiente somma dei duplicati (indispensabile qualora il ciclo di assemblaggio originasse contributi sovrapposti sullo stesso nodo) e permette la rapida conversione finale in formato \texttt{csc\_matrix}, formato nativamente supportato da \texttt{CHOLMOD}.
+
+L'aspetto algoritmico centrale è l'uso della funzione \texttt{cholesky(A, order="natural")} fornita da \texttt{scikit-sparse}. Poiché la matrice $A$ derivante dallo stencil del Laplaciano è simmetrica e definita negativa, e la fattorizzazione di Cholesky si applica esclusivamente a matrici definite positive, la fattorizzazione è stata calcolata su $-A = L L^T$. 
+
+Il sistema triangolare doppio è infine risolto in Python tramite la funzione specializzata \texttt{spsolve\_triangular} (applicata a $L$ come \textit{forward substitution} e a $L^T$ come \textit{backward substitution}), ottenendo il vettore soluzione $u$ che tiene conto del segno negativo originario.
+
+Un elemento architetturale di rilievo che ho introdotto è l'automazione dei test C++. Piuttosto che imporre un'esecuzione manuale separata per ciascun valore di $N$ e per ciascun ordinamento, ho scritto una funzione \texttt{run\_pipeline} che si interfaccia direttamente con i binari C++ usando la libreria standard Python \texttt{subprocess}. Questo approccio chiude l'intero ciclo in Python, permettendo al notebook di comportarsi come un framework end-to-end indipendente e ripetibile con un solo click.
 
 \textbf{Strutture dati.}
 \begin{itemize}
-  \item \texttt{scipy.sparse.csc\_matrix} per $A$ (e $-A$ per la fattorizzazione).
-  \item Array \texttt{numpy.ndarray} per il vettore $b$ e la soluzione $u$.
-  \item Oggetto \texttt{Factor} di CHOLMOD per la fattorizzazione.
+  \item Matrici sparse \texttt{scipy.sparse.coo\_matrix} per l'assemblaggio iniziale flessibile, e \texttt{scipy.sparse.csc\_matrix} per la fattorizzazione e il calcolo algebrico.
+  \item Dati in virgola mobile \texttt{numpy.ndarray} per i tensori della soluzione fisica e del vettore dei termini noti $b$.
+  \item L'oggetto \texttt{Factor} di \texttt{CHOLMOD} (restituito da \texttt{scikit-sparse}), incapsulato per estrarre la matrice $L$ esplicita necessaria al testing.
 \end{itemize}
 
 \textbf{Complessità attesa.}
-Con ordinamento naturale: fill-in $O(N^3)$ e risoluzione $O(N^3)$.
-Con nested dissection: fill-in $O(N^2 \log N)$ e risoluzione $O(N^2 \log N)$.
-
-\textbf{Dipendenze.} Legge \texttt{A.txt} e \texttt{rhs.txt} prodotti dal Modulo 3;
-non genera file ma produce output grafico nel notebook.
+Il fattore dominanate è la fattorizzazione di Cholesky: l'ordinamento naturale impone un fill-in $O(N^3)$ limitando la scalabilità. La \textit{Nested Dissection} riduce drasticamente l'occupazione di memoria a $O(N^2 \log N)$ e il tempo di fattorizzazione a un limite asintotico ottimale di $O(N^3)$ (rispetto a un generico problema denso).
 
 % ------------------------------------------------------------
-\section{Analisi sperimentale attesa}
+\section{Analisi sperimentale (Task 5)}
 % ------------------------------------------------------------
 
-L'obiettivo dell'analisi sperimentale è quantificare il vantaggio computazionale
-della nested dissection rispetto all'ordinamento naturale. Si prevedono le
-seguenti misurazioni per $N \in \{32, 64, 128, 256, 512, 1024\}$:
+L'obiettivo dell'analisi sperimentale è quantificare sul campo il drastico vantaggio computazionale dell'ordinamento a \textit{Nested Dissection} contro il tradizionale approccio naturale. Il benchmark automatizzato esegue test su reti a grana progressivamente più fine, con $N \in \{32, 64, 128, 256, 512\}$.
 
-\begin{center}
-\begin{tabular}{|l|l|l|}
-  \hline
-  \textbf{Grandezza misurata} & \textbf{Ordinamento naturale} & \textbf{Nested dissection} \\
-  \hline
-  \texttt{nnz(A)} & $O(N^2)$ & $O(N^2)$ \\
-  \texttt{nnz(L)} (fill-in) & $O(N^3)$ & $O(N^2 \log N)$ \\
-  Tempo di fattorizzazione & $O(N^3)$ & $O(N^2 \log N)$ (atteso) \\
-  Tempo di risoluzione & $O(N^3)$ & $O(N^2 \log N)$ (atteso) \\
-  \hline
-\end{tabular}
-\end{center}
+I risultati empirici registrati confermano la teoria in modo impressionante.
 
-\medskip
-Il notebook produrrà:
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.9\textwidth]{../output/benchmark_loglog.png}
+  \caption{Grafico in scala log-log del numero di elementi non-zero (fill-in) di $L$ e del tempo computazionale di fattorizzazione, con e senza riordinamento.}
+  \label{fig:benchmark}
+\end{figure}
+
+Come visibile in Figura \ref{fig:benchmark}, il numero di ingressi non nulli per il fattore di Cholesky $L$, denotato come \texttt{nnz(L)}, mostra due curve con andamenti divergenti:
+\begin{itemize}
+    \item L'ordinamento \textbf{naturale} denota una rampa rettilinea in piano bilogaritmico, la cui forte pendenza rispecchia chiaramente la crescita $O(N^3)$ del fill-in.
+    \item L'ordinamento a \textbf{nested dissection} abbatte visibilmente questa crescita. L'andamento curvo più "piatto" traccia la funzione limite asintotica formale $O(N^2 \log N)$.
+\end{itemize}
+
+Lo stesso risparmio monumentale si riflette sui tempi di computazione: a $N=512$, il tempo richiesto dal solver senza ordinamento schizza rapidamente verso l'alto (a causa di un enorme sovraccarico in cache per le dipendenze dense sparse), mentre per la nested dissection il solutore chiude l'operazione in frazioni di secondo.
+
+\subsection{Visualizzazioni Topologiche e Fisiche}
+
+Per avere un check visivo dell'equazione differenziale risolta, il notebook esporta non solo gli spy-plot strutturali. Ho esteso le funzionalità fornendo due strumenti di validazione:
 \begin{enumerate}
-  \item Spy plot di $A$ e di $L$ (fattore di Cholesky) per entrambi gli ordinamenti,
-        per evidenziare visivamente la differenza di fill-in.
-  \item Heatmap 2D o superficie 3D della soluzione $u(x,y)$ per almeno un valore di $N$.
-  \item Grafico log-log di \texttt{nnz(L)} in funzione di $N$: le due curve dovrebbero
-        separare nettamente attorno a $N \ge 64$. Verrà esplicitamente calcolato anche il
-        rapporto $\text{nnz}(L_{\text{natural}}) / \text{nnz}(L_{\text{ND}})$ (fill-in relativo) per
-        evidenziare il risparmio di memoria.
-  \item Grafico dei tempi di fattorizzazione in funzione di $N$, con indicazione della
-        pendenza empirica per stimare l'esponente di crescita.
+    \item \textbf{Mappe di calore e Superfici 3D:} L'array 1D della soluzione calcolata $u$ viene rimappato su una mesh $N \times N$. Tramite l'uso della \textit{inferno colormap}, la mappa di calore 2D e la proiezione tridimensionale con \texttt{plot\_surface} validano la fisicità del modello termico (in particolar modo per test complessi come la funzione $u_0 = \sin(\pi x)$ che disperde il calore verso il "nucleo freddo" centrale del quadrato).
+    \item \textbf{Spy Plots}: La matrice triangolare inferiore $L$ generata dalla fattorizzazione è soggetta allo strumento \texttt{spy} di Matplotlib per $N=32$, rendendo immediatamente evidenti all'occhio i pattern del fill-in: un blocco pieno per l'ordinamento naturale, una struttura elegantemente sparsa a blocchi vuoti per la \textit{nested dissection}.
 \end{enumerate}
 
 % ============================================================
