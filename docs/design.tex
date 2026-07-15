@@ -14,10 +14,10 @@
 \usepackage[italian]{babel}
 \usepackage{lmodern}
 
-% ---- Layout (margini ridotti) ------------------------------
+% ---- Layout ------------------------------------------------
 \usepackage[
-  top=1.8cm, bottom=1.8cm,
-  left=1.8cm, right=1.8cm,
+  top=2.0cm, bottom=2.0cm,
+  left=2.0cm, right=2.0cm,
   headheight=15pt
 ]{geometry}
 \usepackage{parskip}
@@ -26,37 +26,36 @@
 % ---- Matematica --------------------------------------------
 \usepackage{amsmath, amssymb, amsthm}
 
-% ---- Codice ------------------------------------------------
-\usepackage{listings}
-\usepackage{xcolor}
-\lstset{
-  basicstyle=\ttfamily\small,
-  keywordstyle=\color{blue!70!black}\bfseries,
-  commentstyle=\color{green!50!black}\itshape,
-  numbers=left, numberstyle=\tiny\color{gray},
-  backgroundcolor=\color{gray!7},
-  frame=single, rulecolor=\color{gray!40},
-  breaklines=true, showstringspaces=false, tabsize=2
-}
+% ---- Tabelle e box -----------------------------------------
+\usepackage{booktabs}
+\usepackage{array}
 
-% ---- Float e TikZ -----------------------------------------
+% ---- Float e TikZ ------------------------------------------
 \usepackage{float}
 \usepackage{graphicx}
 \usepackage{tikz}
 \usetikzlibrary{shapes.geometric, arrows.meta, positioning, fit, backgrounds}
+
+% ---- Colori ------------------------------------------------
+\usepackage{xcolor}
 
 % ---- Link --------------------------------------------------
 \usepackage[hidelinks]{hyperref}
 
 % ---- Intestazioni ------------------------------------------
 \usepackage{fancyhdr}
-
-
+\pagestyle{fancy}
+\fancyhf{}
+\rhead{\small Equazione del Calore 2D -- Documento di Progetto}
+\lhead{\small Giosuè Aiello}
+\cfoot{\thepage}
 
 % ---- Titolo ------------------------------------------------
 \title{%
   \LARGE\textbf{Equazione del Calore 2D}\\[6pt]
-  \LARGE\textbf{e Riordinamento nelle Fattorizzazioni Cholesky}
+  \LARGE\textbf{e Riordinamento nelle Fattorizzazioni Cholesky}\\[12pt]
+  \large Documento di Progetto\\[4pt]
+  \normalsize Informatica con Laboratorio -- A.A. 2025/2026
 }
 \author{Giosuè Aiello}
 \date{}
@@ -64,6 +63,7 @@
 % ============================================================
 \begin{document}
 \maketitle
+\thispagestyle{empty}
 % ============================================================
 
 % ------------------------------------------------------------
@@ -78,21 +78,20 @@ L'obiettivo del progetto è la risoluzione numerica dell'equazione del calore in
   \label{eq:calore}
 \end{equation}
 
-con condizioni al contorno di Dirichlet omogenee sul bordo $\partial\Omega$:
+con condizioni al contorno di Dirichlet sul bordo $\partial\Omega$:
 \[
-  u(x,y) = u_0(x,y) \equiv 0, \qquad (x,y) \in \partial\Omega.
+  u(x,y) = u_0(x,y), \qquad (x,y) \in \partial\Omega.
 \]
 
-I parametri fisici del problema sono: coefficiente di diffusività termica $\kappa = 0.01$ e termine sorgente $f(x,y) = e^{-10(x^2+y^2)}$, che modella una sorgente di calore concentrata in prossimità dell'origine con decadimento gaussiano.
+I parametri fisici del problema sono: coefficiente di diffusività termica $\kappa = 0.01$ e termine sorgente $f(x,y) = e^{-10(x^2+y^2)}$, che modella una sorgente di calore concentrata in prossimità dell'origine con decadimento gaussiano. Nel caso base si considera $u_0 \equiv 0$ (condizioni omogenee).
 
 \subsection*{Discretizzazione alle differenze finite}
 
-Si introduce una griglia cartesiana uniforme di $(N+2)^2$ punti $(x_i, y_j)$ con $i,j = 0, \dots, N+1$ e passo $h = 1/(N+1)$, dove $x_i = i \cdot h$ e $y_j = j \cdot h$. I punti di bordo hanno temperatura fissata a zero e non contribuiscono come incognite. Le $N^2$ incognite del problema sono i valori $u_{i,j} \approx u(x_i, y_j)$ nei punti \emph{interni} ($1 \le i,j \le N$).
+Si introduce una griglia cartesiana uniforme di $(N+2)^2$ punti $(x_i, y_j)$ con $i,j = 0, \dots, N+1$ e passo $h = 1/(N+1)$, dove $x_i = i \cdot h$ e $y_j = j \cdot h$. I punti di bordo hanno temperatura fissata e non contribuiscono come incognite. Le $N^2$ incognite del problema sono i valori $u_{i,j} \approx u(x_i, y_j)$ nei punti \emph{interni} ($1 \le i,j \le N$).
 
 \begin{figure}[htbp]
     \centering
     \begin{tikzpicture}[scale=0.9]
-        % Definizione dei colori per corrispondere all'immagine originale
         \colorlet{bdraw}{black!60}
         \colorlet{bfill}{gray!20}
         \colorlet{idraw}{blue!80!black}
@@ -100,20 +99,14 @@ Si introduce una griglia cartesiana uniforme di $(N+2)^2$ punti $(x_i, y_j)$ con
         \colorlet{rdraw}{red!80!black}
         \colorlet{rfill}{red!70!white}
 
-        % --- GRIGLIA ---
-        % Griglia unica e uniforme per eliminare l'effetto "cornice" spezzata sui lati
         \draw[black!40, thin] (0,0) grid (7,7);
 
-        % --- STILI PER I NODI ---
-        % Pallini resi un filo più sottili (inner sep ridotto da 1.8pt a 1.2pt)
         \tikzset{
             bnode/.style={circle, draw=bdraw, fill=bfill, inner sep=1.2pt},
             inode/.style={circle, draw=idraw, fill=ifill, inner sep=1.2pt},
             rnode/.style={circle, draw=rdraw, fill=rfill, inner sep=1.2pt}
         }
 
-        % --- DISEGNO DEI PUNTI ---
-        % Punti del bordo (grigi)
         \foreach \x in {0,...,7} {
             \node[bnode] at (\x,0) {};
             \node[bnode] at (\x,7) {};
@@ -122,40 +115,28 @@ Si introduce una griglia cartesiana uniforme di $(N+2)^2$ punti $(x_i, y_j)$ con
             \node[bnode] at (0,\y) {};
             \node[bnode] at (7,\y) {};
         }
-
-        % Punti interni (blu)
         \foreach \x in {1,...,6} {
             \foreach \y in {1,...,6} {
                 \node[inode] (N-\x-\y) at (\x,\y) {};
             }
         }
 
-        % Punto evidenziato (rosso) in posizione (2,2) 
-        % (considerando che l'angolo in basso a sinistra è 0,0)
         \node[rnode] (R) at (2,2) {};
-
-        % --- FRECCE ---
-        % Frecce dal punto rosso verso i 4 punti adiacenti
         \draw[->, >=stealth, rdraw, thick] (R) -- (N-1-2);
         \draw[->, >=stealth, rdraw, thick] (R) -- (N-3-2);
         \draw[->, >=stealth, rdraw, thick] (R) -- (N-2-1);
         \draw[->, >=stealth, rdraw, thick] (R) -- (N-2-3);
 
-        % Etichetta del punto rosso (font sistemato, dimensione ridotta)
-        \node[above right, text=rdraw, fill=white, inner sep=1.5pt, xshift=2pt, yshift=2pt, font=\small] at (R) {$(x_i, y_j)$};
+        \node[above right, text=rdraw, fill=white, inner sep=1.5pt,
+              xshift=2pt, yshift=2pt, font=\small] at (R) {$(x_i, y_j)$};
 
-        % --- ETICHETTE DEGLI ASSI E COORDINATE ---
-        % Font proporzionati per renderli più simili all'originale
         \node[below left=2pt, font=\footnotesize] at (0,0) {$(0,0)$};
         \node[below right=2pt, font=\footnotesize] at (7,0) {$(1,0)$};
         \node[above right=2pt, font=\footnotesize] at (7,7) {$(1,1)$};
-
         \node[below, font=\small] at (3.5, -0.6) {$x$};
         \node[left, font=\small] at (-0.6, 3.5) {$y$};
-
     \end{tikzpicture}
-    
-    \caption{Punti esterni ed interni del dominio, segnati rispettivamente in grigio ed in blu, e punti adiacenti, evidenziati in rosso per un punto di esempio $(x_i, y_j)$.}
+    \caption{Griglia di discretizzazione: nodi di bordo (grigio), nodi interni (blu) e i quattro vicini dello stencil per il nodo $(x_i, y_j)$ (frecce rosse).}
 \end{figure}
 
 Approssimando le derivate seconde con lo stencil a cinque punti, l'equazione~\eqref{eq:calore} valutata nel punto interno $(x_i, y_j)$ diventa:
@@ -165,71 +146,73 @@ Approssimando le derivate seconde con lo stencil a cinque punti, l'equazione~\eq
   \label{eq:stencil}
 \end{equation}
 
-Se un vicino cade sul bordo, il suo valore (zero) viene incorporato nel termine noto senza aggiungere incognite. L'insieme delle equazioni~\eqref{eq:stencil} costituisce il sistema lineare $Au = b$, dove $A \in \mathbb{R}^{N^2 \times N^2}$ è sparsa (al più 5 elementi non nulli per riga), simmetrica e definita negativa.
-
-\newpage
+L'insieme delle equazioni~\eqref{eq:stencil} costituisce il sistema lineare $Au = b$, dove $A \in \mathbb{R}^{N^2 \times N^2}$ è sparsa (al più 5 elementi non nulli per riga), simmetrica e definita negativa.
 
 \subsection*{Fattorizzazione di Cholesky e fill-in}
 
-Poiché $-A$ è simmetrica definita positiva (SPD), si può calcolare la fattorizzazione di Cholesky $-A = LL^T$ con $L$ triangolare inferiore sparsa. Tuttavia, durante la fattorizzazione si generano elementi non nulli in posizioni che erano zero in $-A$: questo fenomeno è detto \emph{fill-in} e dipende fortemente dall'ordine con cui le incognite sono enumerate.
+Poiché $-A$ è simmetrica definita positiva (SPD), si calcola la fattorizzazione di Cholesky $-A = LL^T$ con $L$ triangolare inferiore sparsa. Durante la fattorizzazione si generano elementi non nulli in posizioni che erano zero in $-A$: questo fenomeno è detto \emph{fill-in} e dipende fortemente dall'ordine con cui le incognite sono enumerate.
 
-Con l'ordinamento naturale per righe, la larghezza di banda di $A$ è $\Theta(N)$ e il fill-in di $L$ è $O(N^3)$. La tecnica di \emph{nested dissection} riduce il fill-in a $O(N^2 \log N)$, con un risparmio sostanziale per valori grandi di $N$.
+Con l'ordinamento naturale per righe la larghezza di banda di $A$ è $\Theta(N)$ e il fill-in di $L$ è $O(N^3)$. La tecnica di \emph{nested dissection} riduce il fill-in a $O(N^2 \log N)$, con un risparmio sostanziale per valori grandi di $N$.
 
 \subsection*{Grafo di adiacenza e nested dissection}
 
-La struttura di $A$ è codificata dal \emph{grafo di adiacenza} $G = (V, E)$: ogni nodo $v \in V$ corrisponde a una variabile $u_{i,j}$ e ogni arco $(u,v) \in E$ indica che $A_{uv} \neq 0$. Per la griglia regolare, due nodi sono collegati se e solo se sono vicini orizzontalmente o verticalmente:
+La struttura di $A$ è codificata dal \emph{grafo di adiacenza} $G = (V, E)$: ogni nodo $v \in V$ corrisponde a una variabile $u_{i,j}$ e ogni arco $(u,v) \in E$ indica che $A_{uv} \neq 0$. Per la griglia regolare:
 \[
   (x_i, y_j) \leftrightarrow (x_k, y_l) \iff (i=k,\, |j-l|=1) \;\text{ oppure }\; (j=l,\, |i-k|=1).
 \]
 
-La \emph{nested dissection} individua ricorsivamente un separatore geometrico $V_S$ di cardinalità ridotta che divide $V$ in due insiemi bilanciati $V_1$ e $V_2$ senza archi diretti tra loro. L'ordinamento risultante elenca prima $V_1$, poi $V_2$, infine $V_S$, in modo che il separatore appaia in fondo alla matrice, limitando la propagazione del fill-in. Per la griglia regolare il separatore ottimale è la colonna mediana: scelto $\hat{x}$ mediano, si pone $V_1 = \{u_{i,j}\mid x_i < \hat{x}\}$, $V_2 = \{u_{i,j}\mid x_i > \hat{x}\}$, $V_S = \{u_{i,j}\mid x_i = \hat{x}\}$. Il procedimento viene applicato ricorsivamente a $V_1$ e $V_2$, alternando il taglio lungo $x$ e $y$.
+La \emph{nested dissection} individua ricorsivamente un separatore geometrico $V_S$ che divide $V$ in due insiemi bilanciati $V_1$ e $V_2$ senza archi diretti tra loro. L'ordinamento risultante elenca prima $V_1$, poi $V_2$, infine $V_S$, in modo che il separatore appaia in fondo alla matrice, limitando la propagazione del fill-in. Per la griglia regolare il separatore ottimale è la colonna mediana: scelto $\hat{x}$ mediano, si pone:
+\[
+  V_1 = \{u_{i,j}\mid x_i < \hat{x}\},\quad
+  V_2 = \{u_{i,j}\mid x_i > \hat{x}\},\quad
+  V_S = \{u_{i,j}\mid x_i = \hat{x}\}.
+\]
+Il procedimento viene applicato ricorsivamente a $V_1$ e $V_2$, alternando il taglio lungo $x$ e $y$.
 
 % ------------------------------------------------------------
+\newpage
 \section{Architettura del progetto}
 % ------------------------------------------------------------
 
-Il progetto è strutturato in quattro moduli. I tre moduli in C++ comunicano tra loro attraverso file di testo con formato fisso che fungono da interfaccia verificabile indipendentemente; il modulo Python li legge come punto di ingresso per la fase numerica finale.
+\subsection*{Modulo principale: \texttt{HeatEquationSolver}}
 
-Il diagramma seguente illustra il flusso di elaborazione dall'input $N$ alla soluzione e all'analisi comparativa:
+Il sistema viene concepito come un unico risolutore logico denominato \texttt{HeatEquationSolver}, articolato in quattro sotto-moduli specializzati. I tre moduli in C++ comunicano tra loro attraverso file di testo con formato fisso che fungono da interfaccia verificabile indipendentemente; il modulo Python costituisce il punto di ingresso per la fase numerica finale.
 
-\bigskip
-
-% ---- Diagramma pipeline (verticale formale) --------
+\medskip
 \begin{center}
 \begin{tikzpicture}[
-  node distance = 0.6cm and 1.8cm,
+  node distance = 0.65cm and 2.0cm,
   modcpp/.style = {
-    rectangle,
-    draw=black!70, fill=gray!10, line width=0.8pt,
-    text width=4.5cm, align=center,
-    font=\small\ttfamily\bfseries, minimum height=1.1cm, inner sep=4pt
+    rectangle, rounded corners=3pt,
+    draw=blue!60!black, fill=blue!8, line width=0.8pt,
+    text width=4.6cm, align=center,
+    font=\small\ttfamily\bfseries, minimum height=1.1cm, inner sep=5pt
   },
   modpy/.style = {
-    rectangle,
-    draw=black!70, fill=gray!25, line width=0.8pt,
-    text width=4.5cm, align=center,
-    font=\small\ttfamily\bfseries, minimum height=1.1cm, inner sep=4pt
+    rectangle, rounded corners=3pt,
+    draw=orange!70!black, fill=orange!10, line width=0.8pt,
+    text width=4.6cm, align=center,
+    font=\small\ttfamily\bfseries, minimum height=1.1cm, inner sep=5pt
   },
   filebox/.style = {
     rectangle,
-    draw=black!50, fill=white, line width=0.5pt,
-    text width=3.5cm, align=center,
+    draw=black!40, fill=gray!5, line width=0.5pt,
+    text width=3.4cm, align=center,
     font=\footnotesize\ttfamily, minimum height=0.80cm, inner sep=3pt
   },
   startnode/.style = {
-    rectangle,
+    rectangle, rounded corners=3pt,
     draw=black!70, fill=white, line width=0.8pt,
     font=\small\bfseries, align=center,
     minimum height=0.85cm, minimum width=2.5cm
   },
-  arr/.style     = {-{Stealth[length=6pt]}, line width=0.8pt, black!80},
+  arr/.style     = {-{Stealth[length=6pt]}, line width=0.9pt, black!70},
   arrfile/.style = {-{Stealth[length=5pt]}, line width=0.6pt,
-                    dashed, dash pattern=on 4pt off 2pt, black!60}
+                    dashed, dash pattern=on 4pt off 2pt, black!50}
 ]
 
-% --- colonna sinistra: pipeline ---
 \node[startnode] (IN) {Input $N$};
-\node[modcpp] (T1) [below=0.6cm of IN]
+\node[modcpp] (T1) [below=0.65cm of IN]
   {task1\_grid.cpp\\[2pt]{\normalfont\footnotesize\rmfamily Griglia e grafo}};
 \node[modcpp] (T2) [below=1.2cm of T1]
   {task2\_reorder.cpp\\[2pt]{\normalfont\footnotesize\rmfamily Nested Dissection}};
@@ -238,541 +221,351 @@ Il diagramma seguente illustra il flusso di elaborazione dall'input $N$ alla sol
 \node[modpy]  (NB) [below=1.2cm of T3]
   {solver.ipynb\\[2pt]{\normalfont\footnotesize\rmfamily Cholesky $+$ analisi}};
 
-% --- colonna destra: file ---
-\node[filebox] (F1) [right=1.8cm of T1] {coords.txt\\connectivity.txt};
-\node[filebox] (F2) [right=1.8cm of T2] {ordering.txt};
-\node[filebox] (F3) [right=1.8cm of T3] {A.txt \quad rhs.txt};
+\node[filebox] (F1) [right=2.0cm of T1] {coords.txt\\connectivity.txt};
+\node[filebox] (F2) [right=2.0cm of T2] {ordering.txt};
+\node[filebox] (F3) [right=2.0cm of T3] {A.txt \quad rhs.txt};
 
-% --- frecce pipeline (verticali, bordo-a-bordo) ---
 \draw[arr] (IN.south) -- (T1.north);
 \draw[arr] (T1.south) -- (T2.north);
 \draw[arr] (T2.south) -- (T3.north);
 \draw[arr] (T3.south) -- (NB.north);
 
-% --- frecce output verso file (orizzontali, bordo-a-bordo) ---
 \draw[arrfile] (T1.east) -- (F1.west);
 \draw[arrfile] (T2.east) -- (F2.west);
 \draw[arrfile] (T3.east) -- (F3.west);
 
-% --- frecce file verso modulo successivo (ortogonali a gradino per evitare i blocchi) ---
-\draw[arrfile] (F1.south) -- ++(0,-0.35) -| ([xshift=0.9cm]T2.east) -- (T2.east);
-\draw[arrfile] (F2.south) -- ++(0,-0.35) -| ([xshift=0.9cm]T3.east) -- (T3.east);
-\draw[arrfile] (F3.south) -- ++(0,-0.35) -| ([xshift=0.9cm]NB.east) -- (NB.east);
+\draw[arrfile] (F1.south) -- ++(0,-0.35) -| ([xshift=1.0cm]T2.east) -- (T2.east);
+\draw[arrfile] (F2.south) -- ++(0,-0.35) -| ([xshift=1.0cm]T3.east) -- (T3.east);
+\draw[arrfile] (F3.south) -- ++(0,-0.35) -| ([xshift=1.0cm]NB.east)  -- (NB.east);
 
 \end{tikzpicture}
 
 \smallskip
 {\footnotesize\rmfamily
 \rule{1.5em}{0.8pt}\quad Flusso di esecuzione\qquad
-\raisebox{2pt}{\tikz{\draw[dashed, dash pattern=on 4pt off 2pt] (0,0) -- (1.5em,0);}}\quad Output su file\qquad
-$\square$\quad Moduli C++\qquad
-\textcolor{black!55}{$\blacksquare$}\quad Modulo Python
+\raisebox{2pt}{\tikz{\draw[dashed, dash pattern=on 4pt off 2pt] (0,0) -- (1.5em,0);}}\quad File di interfaccia\qquad
+{\color{blue!60!black}$\blacksquare$}\quad Moduli C++\qquad
+{\color{orange!70!black}$\blacksquare$}\quad Modulo Python
 }
-\end{center}
-
-\newpage
-
-Ogni modulo ha un ruolo preciso all'interno della pipeline:
-
-\medskip
-\begin{center}
-\begin{tikzpicture}[
-  card/.style = {
-    rectangle,
-    draw=black!60, fill=gray!8, line width=0.6pt,
-    text width=16.5cm, align=left,
-    font=\small\rmfamily, inner sep=8pt, minimum height=1.1cm
-  },
-  cardpy/.style = {
-    rectangle,
-    draw=black!60, fill=gray!18, line width=0.6pt,
-    text width=16.5cm, align=left,
-    font=\small\rmfamily, inner sep=8pt, minimum height=1.1cm
-  }
-]
-  \node[card] (r0) at (0, 0)
-    {\textbf{\texttt{task1\_grid.cpp}} \hfill \textit{\footnotesize C++}\\[3pt]
-     Riceve $N$; genera i $N^2$ nodi interni con indici e coordinate
-     (\texttt{coords.txt}) e la lista degli archi del grafo di adiacenza
-     (\texttt{connectivity.txt}).};
-
-  \node[card] (r1) [below=0.28cm of r0]
-    {\textbf{\texttt{task2\_reorder.cpp}} \hfill \textit{\footnotesize C++}\\[3pt]
-     Legge il grafo e calcola la permutazione nested dissection ricorsiva:
-     ad ogni livello individua il separatore geometrico mediano (alternando asse
-     $x$ e $y$) e lo posiziona in coda. Salva la corrispondenza in \texttt{ordering.txt}.};
-
-  \node[card] (r2) [below=0.28cm of r1]
-    {\textbf{\texttt{task3\_assemble.cpp}} \hfill \textit{\footnotesize C++}\\[3pt]
-     Assembla la matrice sparsa $A$ (stencil a 5 punti: $-4\kappa/h^2$
-     in diagonale, $+\kappa/h^2$ fuori diagonale) e il termine noto $b$. Supporta ordinamento naturale e
-     nested dissection. Produce \texttt{A.txt} e \texttt{rhs.txt}.};
-
-  \node[cardpy] (r3) [below=0.28cm of r2]
-    {\textbf{\texttt{solver.ipynb}} \hfill \textit{\footnotesize Python}\\[3pt]
-     Carica \texttt{A.txt} e \texttt{rhs.txt} in formato CSC; fattorizza
-     $-A = LL^T$ con \texttt{sksparse.cholmod}; risolve con
-     \texttt{spsolve\_triangular}. Confronta tempi per $N = 32 \dots 1024$; produce spy plot e grafici
-     della soluzione $u(x,y)$.};
-\end{tikzpicture}
 \end{center}
 
 \bigskip
 
-Le strutture dati fondamentali sono: liste di adiacenza (\texttt{std::vector<std::vector<int>>}) per il grafo nei moduli C++, e matrici sparse in formato CSC (\texttt{scipy.sparse.csc\_matrix}) nel modulo Python.
+\noindent Le strutture dati fondamentali dell'intero sistema sono:
+
+\begin{itemize}
+  \item \textbf{Liste di adiacenza} (\texttt{std::vector<std::vector<int>>}) per la rappresentazione del grafo nei moduli C++.
+  \item \textbf{Vettori di permutazione} (\texttt{std::vector<int>}) per la mappatura tra ordinamento naturale e riordinato.
+  \item \textbf{Formato sparso CSC} (\texttt{scipy.sparse.csc\_matrix}) per la matrice $A$ nel modulo Python, richiesto nativamente da CHOLMOD.
+\end{itemize}
 
 % ------------------------------------------------------------
+\newpage
 \section{Specifiche dei moduli}
 % ------------------------------------------------------------
 
-I quattro moduli vengono di seguito descritti con livello di dettaglio crescente:
-per ciascuno si indicano input, output, funzionalità richieste, strutture dati e
-complessità attesa.
+I quattro sotto-moduli vengono descritti con livello di dettaglio crescente. Per ciascuno si indicano input, output, funzionalità richieste, strutture dati, invarianti, dipendenze e complessità attesa.
 
 % ---- Modulo 1 -----------------------------------------------
-\subsection*{Modulo 1 - \texttt{task1\_grid.cpp}: generazione della griglia e del grafo}
+\subsection*{Modulo 1 -- \texttt{task1\_grid.cpp}: generazione della griglia e del grafo}
 
-Il Modulo 1 è responsabile della creazione della struttura geometrica del dominio e del relativo grafo di adiacenza. Per realizzarlo, ho deciso di scriverlo interamente in C++17 ponendo particolare attenzione alla leggibilità e all'efficienza. Di seguito ripercorro il ragionamento logico che mi ha guidato nella costruzione di questo modulo, passo dopo passo.
+Il Modulo 1 è responsabile della creazione della struttura geometrica del dominio e del relativo grafo di adiacenza. Costituisce il punto di ingresso dell'intera pipeline e non dipende da nessun altro modulo.
 
-\subsubsection*{Formalizzazione Matematica del Dominio e del Grafo}
-Dal punto di vista matematico, il dominio spaziale continuo $\Omega = [0,1]^2$ viene discretizzato in una griglia uniforme. Dato il parametro $N$, il passo spaziale risulta definito come $h = \frac{1}{N+1}$. L'insieme dei nodi interni, che corrispondono alle incognite numeriche del nostro problema differenziale, è descritto dall'insieme:
+\subsubsection*{Formalizzazione matematica}
+
+Il dominio $\Omega = [0,1]^2$ viene discretizzato con passo $h = \frac{1}{N+1}$. L'insieme dei nodi interni (le incognite) è:
 \[
-  V = \{ (x_i, y_j) \mid x_i = i \cdot h, \; y_j = j \cdot h \quad \forall\, i, j \in \{1, \dots, N\} \}
+  V = \{ (x_i, y_j) \mid x_i = i \cdot h,\; y_j = j \cdot h,\quad i, j \in \{1, \dots, N\} \}, \qquad |V| = N^2.
 \]
-La cardinalità di tale insieme è $|V| = N^2$. Al fine di applicare lo stencil alle differenze finite a 5 punti, si costruisce un grafo non orientato $G = (V, E)$, in cui l'insieme degli spigoli $E$ modella l'adiacenza fisica. Due nodi interni $u = (x_i, y_j)$ e $v = (x_k, y_l)$ sono tra loro adiacenti se e solo se la loro distanza euclidea è esattamente pari al passo $h$:
+Il grafo di adiacenza $G = (V, E)$ ha archi:
 \[
-  E = \left\{ \{u, v\} \subset V \mathrel{\bigg|} \sqrt{(x_i - x_k)^2 + (y_j - y_l)^2} = h \right\}
+  E = \left\{ \{u, v\} \subset V \;\middle|\; \sqrt{(x_i - x_k)^2 + (y_j - y_l)^2} = h \right\}.
 \]
-Operativamente, ciò implica che il nodo identificato dagli indici logici $(i,j)$ è connesso ai suoi vicini orizzontali $(i\pm 1, j)$ e verticali $(i, j\pm 1)$, purché tali punti ricadano all'interno del dominio $V$. Agli spigoli viene associata una numerazione intera 1D (o \textit{ID}), ottenuta concatenando le righe della griglia.
+Ogni nodo interno ha al massimo 4 vicini (sinistra, destra, basso, alto). A ogni nodo viene assegnato un identificatore intero univoco tramite la mappa $\phi(i,j) = (i-1) \cdot N + (j-1)$.
 
-\newpage
-\subsubsection*{1. Impostazione e Controllo dei Parametri}
-Come prima cosa, avevo bisogno di impostare il punto di ingresso del mio programma e di assicurarmi di gestire correttamente la directory in cui avrei salvato i risultati. Ho quindi definito una costante logica per la cartella di destinazione e impostato un sistema robusto di controllo sui parametri: se il valore $N$ passato da riga di comando è mancante o non valido (es. stringhe testuali o valori negativi), il programma non si interrompe bruscamente ma entra in un ciclo che richiede interattivamente all'utente un input corretto.
-\begin{lstlisting}[language=C++]
-// Cartella in cui verranno salvati tutti i file generati
-static const string CARTELLA_OUTPUT = "output/";
+\subsubsection*{Specifiche}
 
-// Calcola l'identificatore numerico univoco (ID) di un nodo
-inline int calcola_id_nodo(int i, int j, int N) {
-    return (i - 1) * N + (j - 1);
-}
+\begin{itemize}
+  \item \textbf{Input:} Intero $N > 0$ passato da riga di comando; se assente o non valido, viene richiesto interattivamente.
+  \item \textbf{Output:}
+    \begin{itemize}
+      \item \texttt{output/coords.txt} -- una riga per nodo: \texttt{id i j x y}
+      \item \texttt{output/connectivity.txt} -- una riga per arco: \texttt{u v} con $u < v$
+    \end{itemize}
+  \item \textbf{Funzionalità richieste:}
+    \begin{itemize}
+      \item Parsing e validazione di $N$ con fallback interattivo.
+      \item Generazione dei $N^2$ nodi con ID progressivo e coordinate spaziali (precisione \texttt{double}).
+      \item Costruzione della lista di adiacenza bidirezionale e scrittura degli archi senza duplicati ($u < v$).
+      \item Creazione della directory \texttt{output/} se non esiste.
+    \end{itemize}
+  \item \textbf{Strutture dati:} \texttt{std::vector<std::vector<int>>} di dimensione $N^2$, pre-allocata con \texttt{reserve(4)} per ciascun nodo.
+  \item \textbf{Invarianti:}
+    \begin{itemize}
+      \item La lista di adiacenza è sempre simmetrica: se $v \in \text{adj}[u]$ allora $u \in \textit{adj}[v]$.
+      \item Ogni arco appare esattamente una volta in \texttt{connectivity.txt} (condizione $u < v$).
+      \item Il numero di righe in \texttt{coords.txt} è esattamente $N^2$.
+    \end{itemize}
+  \item \textbf{Dipendenze:} Nessuna. Questo modulo è il primo della pipeline.
+  \item \textbf{Complessità attesa:} $\mathcal{O}(N^2)$ in tempo e spazio.
+\end{itemize}
 
-int main(int argc, char* argv[]) {
-    int N = 0;
-    bool valid = false;
-
-    if (argc == 2) {
-        try {
-            N = stoi(argv[1]);
-            if (N > 0) valid = true;
-            else cerr << "Errore: N deve essere > 0." << endl;
-        } catch (...) {
-            cerr << "Errore: intero non valido." << endl;
-        }
-    } else {
-        cerr << "Uso: " << argv[0] << " <N>" << endl;
-    }
-
-    while (!valid) {
-        cout << "Inserisci un valore intero N > 0: ";
-        string input;
-        if (!(cin >> input)) return 1;
-        try {
-            N = stoi(input);
-            if (N > 0) valid = true;
-            else cerr << "Errore: N deve essere > 0." << endl;
-        } catch (...) {
-            cerr << "Errore: formato non valido." << endl;
-        }
-    }
-    
-    int numero_nodi = N * N;
-    // Crea la cartella output/ se non esiste
-    mkdir(CARTELLA_OUTPUT.c_str(), 0755); 
-\end{lstlisting}
-
-\subsubsection*{2. Generazione dei Nodi e Scrittura delle Coordinate}
-Una volta preparato l'ambiente, il passo successivo è stato generare i nodi veri e propri. Ho scelto di scorrere la griglia iterando sulle righe e sulle colonne in modo naturale. Per ogni nodo calcolo il suo ID univoco (tramite la funzione \texttt{calcola\_id\_nodo}) e determino le coordinate spaziali normalizzate nell'intervallo $(0, 1)$, scrivendo subito il risultato su disco per risparmiare memoria.
-\begin{lstlisting}[language=C++]
-    // --- Generazione Nodi ---
-    auto inizio_coordinate = high_resolution_clock::now();
-    ofstream file_coordinate(CARTELLA_OUTPUT + "coords.txt");
-    file_coordinate << fixed << setprecision(8);
-
-    for (int i = 1; i <= N; ++i) {
-        for (int j = 1; j <= N; ++j) {
-            int id_nodo = calcola_id_nodo(i, j, N);
-            double x = (double)i / (N + 1);
-            double y = (double)j / (N + 1);
-            
-            // Formato: id riga colonna x y
-            file_coordinate << id_nodo << " " << i << " " << j 
-                            << " " << x << " " << y << "\n";
-        }
-    }
-    file_coordinate.close();
-    auto fine_coordinate = high_resolution_clock::now();
-\end{lstlisting}
-Ho forzato l'uso di \texttt{setprecision(8)} per essere sicuro che i valori in virgola mobile non perdessero precisione. Questo dettaglio si è rivelato fondamentale in seguito per calcolare in modo corretto la mediana geometrica nel modulo di partizionamento.
-
-\subsubsection*{3. Costruzione del Grafo di Connessione}
-A questo punto avevo i nodi geometrici, ma mi serviva una struttura logica che rappresentasse i legami fisici della griglia. Ho perciò optato per una lista di adiacenza bidirezionale.
-\begin{lstlisting}[language=C++]
-    // --- Generazione Grafo di Connessione ---
-    auto inizio_connettivita = high_resolution_clock::now();
-    vector<vector<int>> lista_adiacenza(numero_nodi);
-    for (int i = 0; i < numero_nodi; ++i) {
-        lista_adiacenza[i].reserve(4); // Prevenzione riallocazioni
-    }
-
-    for (int i = 1; i <= N; ++i) {
-        for (int j = 1; j <= N; ++j) {
-            int u = calcola_id_nodo(i, j, N);
-            if (j < N) { // Connessione con il vicino in alto
-                int v_alto = calcola_id_nodo(i, j + 1, N);
-                lista_adiacenza[u].push_back(v_alto);
-                lista_adiacenza[v_alto].push_back(u);
-            }
-            if (i < N) { // Connessione con il vicino a destra
-                int v_destra = calcola_id_nodo(i + 1, j, N);
-                lista_adiacenza[u].push_back(v_destra);
-                lista_adiacenza[v_destra].push_back(u);
-            }
-        }
-    }
-\end{lstlisting}
-Per evitare che il vettore \texttt{lista\_adiacenza} venisse continuamente ridimensionato (rallentando pesantemente l'esecuzione), ho pre-allocato la memoria usando \texttt{reserve(4)}, dal momento che sapevo in anticipo che i nodi avrebbero avuto al massimo 4 vicini. Nel ciclo principale, per evitare controlli ridondanti, ho scelto un approccio costruttivo ``in avanti'': collego il nodo corrente soltanto con il suo vicino in alto e con quello a destra, aggiornando le due direzioni contemporaneamente.
-
-\subsubsection*{4. Scrittura del Grafo ed Estrazione degli Archi}
-Infine, dovevo convertire questa struttura in memoria in un formato testuale semplice. Scorrendo la lista di adiacenza, ho imposto una basilare regola di disuguaglianza ($u < v$) in modo da essere certo di scrivere ogni arco non orientato esattamente una volta sola.
-\begin{lstlisting}[language=C++]
-    ofstream file_connettivita(CARTELLA_OUTPUT + "connectivity.txt");
-    for (int u = 0; u < numero_nodi; ++u) {
-        for (int v : lista_adiacenza[u]) {
-            if (u < v) { // Scrive l'arco non orientato una sola volta
-                file_connettivita << u << " " << v << "\n";
-            }
-        }
-    }
-    file_connettivita.close();
-    auto fine_connettivita = high_resolution_clock::now();
-\end{lstlisting}
-
-\subsubsection*{5. Benchmark e Conclusione}
-Per accertarmi che le mie scelte implementative fossero davvero efficienti, ho integrato fin dall'inizio un sistema di \textit{profiling} interno tramite la libreria \texttt{<chrono>}, per misurare i tempi effettivi di processamento.
-\begin{lstlisting}[language=C++]
-    // Benchmark delle performance temporali
-    duration<double, milli> tempo_coordinate = 
-        fine_coordinate - inizio_coordinate;
-    duration<double, milli> tempo_connettivita = 
-        fine_connettivita - inizio_connettivita;
-
-    cout << "Scrittura coords.txt       : " 
-         << tempo_coordinate.count() << " ms\n";
-    cout << "Scrittura connectivity.txt : " 
-         << tempo_connettivita.count() << " ms\n";
-    
-    return 0;
-}
-\end{lstlisting}
-Questa struttura dal design lineare mi ha fornito una base solida e scattante, regalandomi gli input puliti e minimali necessari per iniziare lo sviluppo del \texttt{task2\_reorder.cpp}.
+\subsubsection*{Logica implementativa (pseudo-codice)}
+\begin{verbatim}
+1.  Leggi N da argv; se non valido, chiedi da stdin
+2.  Crea cartella output/ se non esiste
+3.  Per i = 1 .. N:
+4.    Per j = 1 .. N:
+5.      id = (i-1)*N + (j-1)
+6.      x  = i/(N+1),  y = j/(N+1)
+7.      Scrivi (id, i, j, x, y) su coords.txt
+8.      Se j < N: aggiungi arco bidirezionale (id, id+1)
+9.      Se i < N: aggiungi arco bidirezionale (id, id+N)
+10. Per ogni nodo u, per ogni vicino v:
+11.   Se u < v: scrivi (u, v) su connectivity.txt
+\end{verbatim}
 
 % ---- Modulo 2 -----------------------------------------------
-\subsection*{Modulo 2 - \texttt{task2\_reorder.cpp}: nested dissection}
+\subsection*{Modulo 2 -- \texttt{task2\_reorder.cpp}: nested dissection}
 
-Il Modulo 2 costituisce il cuore algoritmico del progetto. Il suo compito è calcolare una permutazione ottimizzata dei nodi del grafo tramite l'euristica della \textit{nested dissection}, al fine di minimizzare il fill-in durante la fattorizzazione di Cholesky. Di seguito descrivo nel dettaglio le mie scelte architetturali e i passi implementativi.
+Il Modulo 2 costituisce il cuore algoritmico del progetto. Calcola una permutazione ottimizzata dei nodi tramite l'euristica della \textit{nested dissection}, al fine di minimizzare il fill-in durante la fattorizzazione di Cholesky.
 
-\subsubsection*{Formalizzazione Matematica del Partizionamento}
-Da un punto di vista formale, l'algoritmo di nested dissection opera sul grafo $G = (V,E)$. L'obiettivo è individuare un separatore $V_S \subset V$ di cardinalità minima che disconnetta il grafo in due sottografi $G_1 = (V_1, E_1)$ e $G_2 = (V_2, E_2)$ approssimativamente della stessa dimensione, tali per cui non vi siano spigoli tra $V_1$ e $V_2$.
-Dato un sottoinsieme di nodi $S \subseteq V$, la procedura seleziona iterativamente un asse di taglio (alternando $x$ e $y$). Selezionato, ad esempio, l'asse $x$, si individua la coordinata mediana $\hat{x}$ e si definiscono:
+\subsubsection*{Formalizzazione matematica}
+
+L'algoritmo opera sul grafo $G = (V,E)$ e individua ricorsivamente un separatore $V_S \subset V$ che partiziona $V$ in tre insiemi disgiunti senza archi tra $V_1$ e $V_2$:
 \begin{align*}
-  V_1 &= \{ (x_i, y_j) \in S \mid x_i < \hat{x} \} \\
-  V_2 &= \{ (x_i, y_j) \in S \mid x_i > \hat{x} \} \\
-  V_S &= \{ (x_i, y_j) \in S \mid x_i = \hat{x} \}
+  V_1 &= \{ (x_i, y_j) \in S \mid c < \hat{c} \} \\
+  V_2 &= \{ (x_i, y_j) \in S \mid c > \hat{c} \} \\
+  V_S &= \{ (x_i, y_j) \in S \mid c = \hat{c} \}
 \end{align*}
-I nodi in $V_1$ vengono enumerati per primi, seguiti dai nodi in $V_2$, ed infine dai nodi del separatore $V_S$, applicando la medesima logica ricorsivamente su $V_1$ e $V_2$.
+dove $c \in \{x, y\}$ è la coordinata dell'asse di taglio e $\hat{c}$ è il valore mediano. L'ordinamento risultante è $V_1 \to V_2 \to V_S$, applicato ricorsivamente alternando gli assi.
 
-\newpage
-\subsubsection*{1. Lettura dei Dati e Definizione delle Strutture Dati}
-Come prima operazione, avevo la necessità di caricare in memoria i dati geometrici generati dal Modulo 1. Poiché la logica si basa sulle sole coordinate, ho definito una struttura compatta \texttt{Node} e ho caricato l'intero contenuto del file \texttt{coords.txt} in un vettore. Ho poi implementato la lettura formale del file \texttt{connectivity.txt} per aderire ai requisiti rigorosi di progetto.
-\begin{lstlisting}[language=C++]
-struct Node {
-    int id;
-    int i;
-    int j;
-    double x;
-    double y;
-};
+\subsubsection*{Specifiche}
 
-// ...
-vector<Node> nodes;
-int n, i, j;
-double x, y;
-while (coords_file >> n >> i >> j >> x >> y) {
-    nodes.push_back({n, i, j, x, y});
-}
-\end{lstlisting}
+\begin{itemize}
+  \item \textbf{Input:} \texttt{output/coords.txt} e \texttt{output/connectivity.txt} (prodotti dal Modulo 1).
+  \item \textbf{Output:} \texttt{output/ordering.txt} -- una riga per posizione: \texttt{nuova\_pos vecchio\_id}
+  \item \textbf{Funzionalità richieste:}
+    \begin{itemize}
+      \item Lettura delle coordinate e caricamento del grafo.
+      \item Partizionamento iterativo tramite stack esplicito (per evitare stack overflow su griglie grandi).
+      \item Calcolo della mediana geometrica con alternanza degli assi $x$/$y$ ad ogni livello.
+      \item Salvataggio dell'ordinamento su \texttt{ordering.txt}.
+    \end{itemize}
+  \item \textbf{Strutture dati:} \texttt{struct Node \{id, i, j, x, y\}}; \texttt{struct StackItem \{vector<Node>, axis, is\_separator\}}; \texttt{std::stack<StackItem>} allocato sull'heap; \texttt{std::vector<int> ordering} di dimensione $N^2$.
+  \item \textbf{Invarianti:}
+    \begin{itemize}
+      \item Il vettore \texttt{ordering} è una permutazione valida di $\{0, \dots, N^2-1\}$: ogni indice compare esattamente una volta.
+      \item I nodi del separatore $V_S$ compaiono sempre \emph{dopo} i nodi di $V_1$ e $V_2$ alla stessa profondità di ricorsione.
+      \item L'asse di taglio si alterna ad ogni livello (0=X, 1=Y).
+    \end{itemize}
+  \item \textbf{Dipendenze:} Modulo 1 (\texttt{coords.txt}, \texttt{connectivity.txt}).
+  \item \textbf{Complessità attesa:} $\mathcal{O}(N^2 \log N)$ in tempo; $\mathcal{O}(N^2)$ in spazio.
+\end{itemize}
 
-\subsubsection*{2. Implementazione Iterativa con Stack Esplicito}
-L'algoritmo di nested dissection ha intrinsecamente una natura ricorsiva. Tuttavia, per griglie molto grandi ($N \gg 1000$), un approccio basato sulle normali chiamate a funzione rischiava di esaurire lo spazio dello stack, provocando crash indesiderati (\textit{stack overflow}). Ho deciso quindi di convertire la logica in una forma puramente iterativa, impiegando uno \texttt{std::stack} esplicito allocato nell'heap, che mi ha garantito grande stabilità.
-\begin{lstlisting}[language=C++]
-struct StackItem {
-    vector<Node> S;   // sottoinsieme di nodi da processare
-    int axis;         // asse di taglio corrente (0=X, 1=Y)
-    bool separatore;  // flag: indica se l'item e' un separatore finale
-};
-
-void nested_dissection(const vector<Node>& nodi_iniziali, int axis_iniziale, vector<int>& ordering) {
-    stack<StackItem> stk;
-    stk.push({nodi_iniziali, axis_iniziale, false});
-    
-    while (!stk.empty()) {
-        StackItem item = move(stk.top());
-        stk.pop();
-        // ...
-\end{lstlisting}
-
-\subsubsection*{3. Estrazione del Separatore Geometrico}
-All'interno del ciclo principale, procedo all'estrazione delle coordinate minime e massime per calcolare la mediana. Una volta determinato il valore medio, suddivido i nodi nei tre insiemi $V_1, V_2, V_S$.
-La vera accortezza risiede nell'ordine di inserimento nello stack: dovendo processare per primo l'insieme $V_1$, esso deve essere inserito per ultimo (\textit{Last-In, First-Out}). 
-\begin{lstlisting}[language=C++]
-        // Calcolo coordinata mediana
-        int mid_val = (min_val + max_val) / 2;
-
-        vector<Node> V1, V2, VS;
-        for (const auto& node : item.S) {
-            int val = (item.axis == 0) ? node.i : node.j;
-            if (val < mid_val)      V1.push_back(node);
-            else if (val > mid_val) V2.push_back(node);
-            else                    VS.push_back(node);
-        }
-
-        // Push invertito per eseguire V1 -> V2 -> VS
-        stk.push({VS, item.axis,      true});
-        stk.push({V2, 1 - item.axis,  false});
-        stk.push({V1, 1 - item.axis,  false});
-    }
-}
-\end{lstlisting}
-
-\subsubsection*{4. Salvataggio della Permutazione e Benchmark}
-Al termine del processo iterativo, l'ordinamento è pronto e viene salvato sul vettore. Per calcolare il tempo di esecuzione, ho utilizzato la libreria \texttt{<chrono>}, ripetendo un pattern di misurazione simile a quello che ho impiegato nel Modulo 1. L'output finale viene salvato nel file \texttt{ordering.txt} secondo un formato che fa corrispondere la nuova posizione (l'indice) al vecchio identificatore logico del nodo.
-\begin{lstlisting}[language=C++]
-    // ... avvio timer chrono ...
-    nested_dissection(nodes, 0, ordering);
-    // ... arresto timer chrono ...
-    
-    ofstream out_file(OUTPUT_DIR + "ordering.txt");
-    for (size_t k = 0; k < ordering.size(); ++k) {
-        out_file << k << " " << ordering[k] << "\n";
-    }
-    out_file.close();
-\end{lstlisting}
-Questo secondo modulo risulta così essere robusto da un punto di vista algoritmico, limitando l'uso della memoria e offrendo un tempo asintotico di esecuzione atteso pari a $O(N^2 \log N)$.
+\subsubsection*{Logica implementativa (pseudo-codice)}
+\begin{verbatim}
+1.  Carica nodi da coords.txt
+2.  Inizializza stack con (tutti i nodi, asse=X)
+3.  Finché stack non vuoto:
+4.    Estrai (Nodi, asse) dallo stack
+5.    Se |Nodi| == 1: aggiungi Nodi[0].id a ordering; continua
+6.    Calcola mediana mid = (min_coord + max_coord) / 2 lungo asse
+7.    Partiziona: V1 (coord < mid), V2 (coord > mid), VS (coord == mid)
+8.    Push nello stack (LIFO: V1 elaborato per primo):
+9.        push(VS, asse)           -- separatore, elaborato per ultimo
+10.       push(V2, 1 - asse)
+11.       push(V1, 1 - asse)
+12. Scrivi ordering.txt: per k = 0..N^2-1, scrivi (k, ordering[k])
+\end{verbatim}
 
 % ---- Modulo 3 -----------------------------------------------
-\subsection*{Modulo 3 - \texttt{task3\_assemble.cpp}: assemblaggio del sistema lineare}
+\subsection*{Modulo 3 -- \texttt{task3\_assemble.cpp}: assemblaggio del sistema lineare}
 
-Il Modulo 3 è incaricato di costruire il sistema lineare che approssima l'equazione differenziale. Ho progettato questo task per accettare sia l'ordinamento naturale della griglia, sia quello ottimizzato prodotto dal Modulo 2 tramite l'apposito flag \texttt{--reorder}.
+Il Modulo 3 costruisce il sistema lineare $Au = b$ che approssima l'equazione differenziale. Supporta sia l'ordinamento naturale che quello ottimizzato via il flag \texttt{--reorder}, e implementa la parte opzionale delle condizioni al bordo non omogenee.
 
-\subsubsection*{Formalizzazione Matematica del Sistema Lineare}
-Dal punto di vista matematico, lo scopo è assemblare il sistema $A u = b$. L'equazione del calore stazionaria, $\kappa \nabla^2 u + f = 0$, viene approssimata utilizzando lo stencil alle differenze finite a 5 punti. Per ogni nodo $k$ con coordinate $(x_{i(k)}, y_{j(k)})$ e considerando il passo spaziale $h = \frac{1}{N+1}$, i coefficienti della matrice sparsa $A$ risultano:
+\subsubsection*{Formalizzazione matematica}
+
+Applicando lo stencil a 5 punti con passo $h = 1/(N+1)$ e diffusività $\kappa$, i coefficienti della matrice per ogni nodo $k$ (nel nuovo ordinamento) sono:
 \begin{align*}
-  A_{k,k} &= -\frac{4\kappa}{h^2} \\
-  A_{k,k'} &= +\frac{\kappa}{h^2} \quad \text{per ogni nodo interno adiacente } k'
+  A_{k,k}  &= -\frac{4\kappa}{h^2} \\
+  A_{k,k'} &= +\frac{\kappa}{h^2} \qquad \text{per ogni vicino interno } k'
 \end{align*}
-Il termine noto viene posto pari a $b_k = -f(x_{i(k)}, y_{j(k)})$. Nel caso in cui il nodo adiacente $k'$ cada sul bordo del dominio, il corrispondente valore è fissato a zero (condizioni di Dirichlet omogenee), perciò il suo contributo viene spostato al termine noto $b_k$ che, in questo caso specifico, non subisce alterazioni numeriche.
-
-\newpage
-\subsubsection*{1. Gestione degli Argomenti e Lettura Coordinate}
-Per garantire robustezza, la prima operazione che eseguo è il controllo degli argomenti da riga di comando per l'attivazione opzionale della nested dissection. Successivamente, leggo il file \texttt{coords.txt}, allocando uno spazio predefinito per le coordinate dei nodi e assicurandomi che il numero di entrate coincida con $N^2$.
-\begin{lstlisting}[language=C++]
-    int N = stoi(argv[1]);
-    bool usa_reorder = false;
-    if (argc == 3 && string(argv[2]) == "--reorder") {
-        usa_reorder = true;
-    }
-    
-    // ... Lettura di coords.txt ...
-    while (file_coords >> id >> ri >> rj >> rx >> ry) {
-        coords[id] = {id, ri, rj, rx, ry};
-        contatore_nodi++;
-    }
-\end{lstlisting}
-
-\subsubsection*{2. Lettura della Permutazione (Opzionale)}
-Se richiesto, carico il file \texttt{ordering.txt} e costruisco le mappe di permutazione diretta e inversa, fondamentali per mappare la topologia logica del problema fisico all'interno della struttura riordinata della matrice in tempo costante $O(1)$. Se l'ordinamento richiesto è quello naturale, istanzio semplicemente un vettore identità.
-\begin{lstlisting}[language=C++]
-    vector<int> perm(num_nodi);
-    vector<int> inv_perm(num_nodi);
-
-    if (usa_reorder) {
-        // ... Lettura new_id e old_id da file ...
-        perm[new_id]     = old_id;
-        inv_perm[old_id] = new_id;
-    } else {
-        for (int k = 0; k < num_nodi; ++k) {
-            perm[k]     = k;
-            inv_perm[k] = k;
-        }
-    }
-\end{lstlisting}
-
-\subsubsection*{3. Assemblaggio dei Coefficienti dello Stencil}
-La fase di assemblaggio vera e propria itera sui nodi in funzione del loro nuovo indice $k$. Per ogni nodo calcolo l'entrata diagonale e applico lo stencil esplorando i 4 vicini topologici (sinistra, destra, basso, alto). Nel calcolo uso i coefficienti costanti pre-calcolati dipendenti da $\kappa$ e $h$. Per minimizzare le allocazioni, memorizzo le entrate non nulle in un vettore di \texttt{Triplet} pre-allocato (\texttt{reserve}).
-\begin{lstlisting}[language=C++]
-    for (int k = 0; k < num_nodi; ++k) {
-        int old_id = perm[k];
-        // ... estrazione coordinate (ri, rj) ...
-        
-        triplets.push_back({k, k, coeff_diag});
-        rhs[k] = -f_sorgente(x, y);
-
-        for (int d = 0; d < 4; ++d) {
-            int ni = ri + di[d];
-            int nj = rj + dj[d];
-
-            if (ni < 1 || ni > N || nj < 1 || nj > N) {
-                // Condizione di Dirichlet sul bordo
-                rhs[k] -= coeff_fuori_diag * 0.0;
-            } else {
-                // Nodo interno riordinato
-                int old_id_vicino = id_naturale(ni, nj, N);
-                int k_vicino      = inv_perm[old_id_vicino];
-                triplets.push_back({k, k_vicino, coeff_fuori_diag});
-            }
-        }
-    }
-\end{lstlisting}
-
-\subsubsection*{4. Salvataggio della Matrice sparsa e del Termine Noto}
-Infine, salvo i risultati esportando il vettore termine noto e i tripli iterando linearmente sulla collezione. Ho applicato la modalità di scrittura formattata \texttt{fixed} con precisione decimale di 10 cifre per assicurare la conservazione dei coefficienti numerici in virgola mobile ad alta precisione.
-L'algoritmo assembla il tutto in un tempo di elaborazione lineare $O(N^2)$, un aspetto critico per scalare facilmente il codice a reti con un gran numero di incognite.
-
-\subsubsection*{Parte Opzionale - Condizioni al Bordo Non Omogenee $u_0(x,y) \neq 0$}
-Ho implementato la parte opzionale richiesta dalla specifica: la possibilità di scegliere una funzione di bordo $u_0(x,y) \neq 0$, modificando il vettore dei termini noti in modo coerente con la discretizzazione.
-
-\paragraph*{Formalizzazione.}
-Quando un vicino del nodo $k$ nella direzione $d$ cade sul bordo nella posizione fisica $(x_{\text{bordo}}, y_{\text{bordo}})$, il suo valore è noto e non entra nella matrice $A$. Il suo contributo va spostato al termine noto:
+Il termine noto è $b_k = -f(x_{i(k)}, y_{j(k)})$. Se il vicino $k'$ cade sul bordo (condizione di Dirichlet), il suo valore $u_0$ è noto e viene incorporato nel termine noto:
 \begin{equation*}
-  b_k \;\mathrel{{-}{=}}\; \frac{\kappa}{h^2} \cdot u_0(x_{\text{bordo}},\, y_{\text{bordo}})
+  b_k \;\mathrel{{-}{=}}\; \frac{\kappa}{h^2} \cdot u_0\!\left(x_{\text{bordo}},\, y_{\text{bordo}}\right).
 \end{equation*}
-Le coordinate fisiche del nodo di bordo si ottengono direttamente come $x = n_i \cdot h$, $y = n_j \cdot h$, dove $(n_i, n_j) \in \{0, N{+}1\}$ per costruzione.
 
-\paragraph*{Interfaccia Utente.}
-All'avvio, il programma presenta un menu interattivo che consente all'utente di scegliere la condizione al bordo prima dell'inizio del ciclo di assemblaggio. La selezione avviene una volta sola; il ciclo interno resta privo di branch aggiuntivi.
-\begin{lstlisting}[language=C++]
-// Selezione PRIMA del ciclo - costo O(1)
-int scelta_bordo = 0;
-cin >> scelta_bordo;
+\subsubsection*{Specifiche}
 
-// Nel ciclo - solo una chiamata a funzione
-double x_bordo = ni * h;
-double y_bordo = nj * h;
-rhs[k] -= coeff_fuori_diag * get_u0(x_bordo, y_bordo, scelta_bordo);
-\end{lstlisting}
+\begin{itemize}
+  \item \textbf{Input:} Intero $N$ e flag opzionale \texttt{--reorder} da riga di comando; \texttt{output/coords.txt}; \texttt{output/ordering.txt} (solo se \texttt{--reorder}).
+  \item \textbf{Output:} \texttt{output/A.txt} (triplette \texttt{i j val}) e \texttt{output/rhs.txt} (una riga per valore di $b$).
+  \item \textbf{Funzionalità richieste:}
+    \begin{itemize}
+      \item Lettura di \texttt{coords.txt} e costruzione della mappa $\phi^{-1}: (i,j) \to \text{id}$.
+      \item Se \texttt{--reorder}: lettura di \texttt{ordering.txt} e costruzione di \texttt{perm} e \texttt{inv\_perm}; altrimenti vettori identità.
+      \item Menu interattivo per la scelta della condizione al bordo $u_0$ (selezione avviene una sola volta, prima del ciclo di assemblaggio).
+      \item Assemblaggio dello stencil con gestione delle condizioni di Dirichlet.
+      \item Scrittura di \texttt{A.txt} e \texttt{rhs.txt} con precisione floating-point a 10 cifre decimali.
+    \end{itemize}
+  \item \textbf{Strutture dati:} \texttt{std::vector<int> perm, inv\_perm} di dimensione $N^2$; \texttt{struct Triplet \{int row, col; double val\}}; \texttt{std::vector<Triplet>} pre-allocato con \texttt{reserve(5*N*N)}; \texttt{std::vector<double> rhs}.
+  \item \textbf{Invarianti:}
+    \begin{itemize}
+      \item \texttt{perm} e \texttt{inv\_perm} sono permutazioni inverse l'una dell'altra: \texttt{inv\_perm[perm[k]] == k} per ogni $k$.
+      \item La matrice $A$ è simmetrica: se la tripletta $(k, k', v)$ è presente, lo è anche $(k', k, v)$.
+      \item Il numero di righe in \texttt{rhs.txt} è esattamente $N^2$.
+    \end{itemize}
+  \item \textbf{Dipendenze:} Modulo 1 (\texttt{coords.txt}); Modulo 2 (\texttt{ordering.txt}, solo se \texttt{--reorder}).
+  \item \textbf{Complessità attesa:} $\mathcal{O}(N^2)$ in tempo (al più 5 entrate per nodo) e spazio.
+\end{itemize}
 
-\paragraph*{Funzioni Disponibili.}
-Ho implementato sei funzioni di bordo, ciascuna scelta per una precisa utilità di verifica numerica:
+\subsubsection*{Logica implementativa (pseudo-codice)}
+\begin{verbatim}
+1.  Leggi N e flag --reorder
+2.  Carica coords.txt in mappa coords[id] = {i, j, x, y}
+3.  Se --reorder: carica ordering.txt, costruisci perm e inv_perm
+4.               altrimenti: perm[k] = inv_perm[k] = k
+5.  Scegli condizione al bordo u0 (menu: scelte 0..5)
+6.  Per k = 0 .. N^2 - 1:
+7.    old_id = perm[k]; leggi (i, j, x, y) da coords[old_id]
+8.    Aggiungi triplet (k, k, -4*kappa/h^2)
+9.    b[k] = -f(x, y)
+10.   Per ogni direzione d in {su, giu, sx, dx}:
+11.     (ni, nj) = vicino di (i,j) in direzione d
+12.     Se (ni,nj) fuori dominio:
+13.       b[k] -= (kappa/h^2) * u0(ni*h, nj*h)
+14.     Altrimenti:
+15.       k_vic = inv_perm[id_naturale(ni,nj)]
+16.       Aggiungi triplet (k, k_vic, +kappa/h^2)
+17. Scrivi A.txt (triplet) e rhs.txt (vettore b)
+\end{verbatim}
+
+\subsubsection*{Condizioni al bordo disponibili (parte opzionale)}
 
 \begin{center}
-\begin{tabular}{clll}
-\hline
-\textbf{Scelta} & \textbf{Funzione $u_0(x,y)$} & \textbf{Scopo} \\
-\hline
+\begin{tabular}{clp{7cm}}
+\toprule
+\textbf{Scelta} & \textbf{Funzione $u_0(x,y)$} & \textbf{Utilità di verifica} \\
+\midrule
 0 & $0$ & Caso base omogeneo (default) \\
-1 & $10$ & Se $f{=}0$, la soluzione deve essere $\equiv 10$ (sanity check) \\
-2 & $x$ & Se $f{=}0$, la soluzione interna deve coincidere con $x$ \\
-3 & $\sin(\pi x)$ & Bordo continuo, si annulla negli angoli (no discontinuità) \\
-4 & $x^2 - y^2$ & $\nabla^2(x^2{-}y^2){=}0$, quindi la soluzione numerica deve essere esatta \\
+1 & $10$ & Con $f=0$, la soluzione deve essere $\equiv 10$ \\
+2 & $x$ & Con $f=0$, la soluzione interna deve coincidere con $x$ \\
+3 & $\sin(\pi x)$ & Bordo continuo; si annulla agli angoli \\
+4 & $x^2 - y^2$ & $\nabla^2(x^2-y^2)=0$: soluzione numerica esatta \\
 5 & $\mathbf{1}_{y=1}$ & Shock termico: solo il bordo superiore è caldo \\
-\hline
+\bottomrule
 \end{tabular}
 \end{center}
 
-\paragraph*{Verifica.}
-Ho verificato la correttezza dell'implementazione con $N=4$ confrontando il $\Delta b_k = b_k^{(u_0)} - b_k^{(0)}$ calcolato dal programma con il valore atteso teorico per ogni nodo adiacente al bordo. Per la Scelta 1 ($u_0 = 10$), il delta atteso è $-\kappa/h^2 \cdot 10 \cdot (\text{numero vicini di bordo})$; per la Scelta 2 ($u_0 = x$) dipende dalla coordinata $x$ del nodo di bordo. I 16 nodi di bordo verificati hanno restituito un errore $< 10^{-10}$, e i 4 nodi interni hanno delta esattamente pari a zero.
+\noindent\textbf{Verifica.} Con $N=4$ si confronta $\Delta b_k = b_k^{(u_0)} - b_k^{(0)}$ calcolato dal programma con il valore teorico atteso per ogni nodo adiacente al bordo. I 16 nodi adiacenti al bordo devono restituire un errore $< 10^{-10}$; i 4 nodi interni devono avere $\Delta b_k = 0$.
 
 % ---- Modulo 4 -----------------------------------------------
-\subsection*{Modulo 4 - \texttt{solver.ipynb}: soluzione e analisi}
+\subsection*{Modulo 4 -- \texttt{solver.ipynb}: risoluzione e analisi numerica}
 
-\textbf{Input.}
+Il Modulo 4 è il punto terminale della pipeline. Legge i file prodotti dal Modulo 3, esegue la fattorizzazione di Cholesky e risolve il sistema lineare. Include anche la fase di analisi sperimentale comparativa tra le due strategie di ordinamento.
+
+\subsubsection*{Specifiche}
+
 \begin{itemize}
-  \item \texttt{A.txt} e \texttt{rhs.txt} in formato sparso $(i,j,\text{val})$ / vettore.
-  \item Parametro $N$ (o serie di valori $N \in \{32, 64, 128, 256, 512, 1024\}$).
+  \item \textbf{Input:}
+    \begin{itemize}
+      \item \texttt{output/A.txt} e \texttt{output/rhs.txt} (prodotti dal Modulo 3).
+      \item Parametro $N$ (o serie $N \in \{32, 64, 128, 256, 512, 1024\}$ per il benchmark).
+    \end{itemize}
+  \item \textbf{Output:}
+    \begin{itemize}
+      \item Vettore soluzione $u \in \mathbb{R}^{N^2}$, rimappato sulla griglia originale per la visualizzazione.
+      \item Spy plot della matrice $A$ e del fattore $L$ per ordinamento naturale e nested dissection.
+      \item Mappa di calore 2D e superficie 3D della soluzione $u(x,y)$.
+      \item Grafico log-log del fill-in \texttt{nnz(L)} e dei tempi di fattorizzazione al variare di $N$.
+    \end{itemize}
+  \item \textbf{Funzionalità richieste:}
+    \begin{itemize}
+      \item Lettura di \texttt{A.txt} e costruzione di \texttt{scipy.sparse.coo\_matrix}, con conversione in \texttt{csc\_matrix}.
+      \item Fattorizzazione $-A = LL^T$ tramite \texttt{sksparse.cholmod.cholesky} con \texttt{order="natural"}.
+      \item Risoluzione del sistema con \texttt{scipy.sparse.linalg.spsolve\_triangular} (forward e backward substitution).
+      \item Automazione dell'intera pipeline C++ tramite \texttt{subprocess} per ciascun valore di $N$ e ordinamento.
+      \item Misurazione dei tempi con \texttt{time.perf\_counter}.
+    \end{itemize}
+  \item \textbf{Strutture dati:}
+    \begin{itemize}
+      \item \texttt{scipy.sparse.coo\_matrix} per l'assemblaggio iniziale; \texttt{csc\_matrix} per la fattorizzazione.
+      \item \texttt{numpy.ndarray} per la soluzione $u$ e il termine noto $b$.
+      \item Oggetto \texttt{Factor} di CHOLMOD per estrarre la matrice $L$ esplicita.
+    \end{itemize}
+  \item \textbf{Invarianti:}
+    \begin{itemize}
+      \item La matrice costruita da \texttt{coo\_matrix} deve essere simmetrica e definita negativa.
+      \item Il vettore soluzione $u$ deve soddisfare $\|Au - b\|_2 / \|b\|_2 < 10^{-10}$ (residuo relativo).
+    \end{itemize}
+  \item \textbf{Dipendenze:} Modulo 3 (\texttt{A.txt}, \texttt{rhs.txt}); librerie \texttt{scipy}, \texttt{numpy}, \texttt{scikit-sparse}, \texttt{matplotlib}.
+  \item \textbf{Complessità attesa:} Fill-in $O(N^3)$ con ordinamento naturale; $O(N^2 \log N)$ con nested dissection. Tempo di fattorizzazione dominato dal fill-in.
 \end{itemize}
 
-\textbf{Output.}
-\begin{itemize}
-  \item Soluzione $u \in \mathbb{R}^{N^2}$ del sistema $Au = b$ (riordinata nella
-        griglia originale per la visualizzazione).
-  \item Spy plot della struttura di $A$ prima e dopo il riordinamento.
-  \item Grafico della soluzione $u(x,y)$ come superficie o heatmap 2D.
-  \item Tabella/grafico comparativo di tempi di fattorizzazione e numero di
-        elementi non nulli di $L$ per le due strategie di ordinamento.
-\end{itemize}
-
-\textbf{Funzionalità richieste.}
-\begin{itemize}
-  \item Lettura dei file e costruzione di \texttt{scipy.sparse.csc\_matrix} (o \texttt{coo\_matrix}),
-        che gestiscono automaticamente la somma delle entrate duplicate dovute alla simmetria del file \texttt{A.txt}.
-  \item Fattorizzazione $-A = LL^T$ tramite \texttt{sksparse.cholmod.cholesky}
-        con \texttt{order="natural"} (l'ordinamento è già codificato in $A$).
-  \item Soluzione del sistema lineare tramite \texttt{scipy.sparse.linalg.spsolve\_triangular}.
-  \item Misurazione del tempo di esecuzione (con \texttt{time.perf\_counter}) per
-        ciascun valore di $N$ e per entrambe le strategie di ordinamento.
-\end{itemize}
-
-\textbf{Logica e scelte implementative.}
-La risoluzione del sistema è stata sviluppata interamente all'interno di un Notebook Jupyter (\texttt{solver.ipynb}), che orchestra sia la fattorizzazione di Cholesky sia i test sperimentali.
-
-Ho deciso di organizzare il notebook in sezioni modulari, partendo dal parsing dell'input: la lettura dei file generati in C++ avviene riga per riga per costruire liste di indici (righe e colonne) e valori, che vengono poi iniettate in un oggetto \texttt{coo\_matrix} di \texttt{scipy.sparse}. Questa scelta garantisce un'efficiente somma dei duplicati (indispensabile qualora il ciclo di assemblaggio originasse contributi sovrapposti sullo stesso nodo) e permette la rapida conversione finale in formato \texttt{csc\_matrix}, formato nativamente supportato da \texttt{CHOLMOD}.
-
-L'aspetto algoritmico centrale è l'uso della funzione \texttt{cholesky(A, order="natural")} fornita da \texttt{scikit-sparse}. Poiché la matrice $A$ derivante dallo stencil del Laplaciano è simmetrica e definita negativa, e la fattorizzazione di Cholesky si applica esclusivamente a matrici definite positive, la fattorizzazione è stata calcolata su $-A = L L^T$. 
-
-Il sistema triangolare doppio è infine risolto in Python tramite la funzione specializzata \texttt{spsolve\_triangular} (applicata a $L$ come \textit{forward substitution} e a $L^T$ come \textit{backward substitution}), ottenendo il vettore soluzione $u$ che tiene conto del segno negativo originario.
-
-Un elemento architetturale di rilievo che ho introdotto è l'automazione dei test C++. Piuttosto che imporre un'esecuzione manuale separata per ciascun valore di $N$ e per ciascun ordinamento, ho scritto una funzione \texttt{run\_pipeline} che si interfaccia direttamente con i binari C++ usando la libreria standard Python \texttt{subprocess}. Questo approccio chiude l'intero ciclo in Python, permettendo al notebook di comportarsi come un framework end-to-end indipendente e ripetibile con un solo click.
-
-\textbf{Strutture dati.}
-\begin{itemize}
-  \item Matrici sparse \texttt{scipy.sparse.coo\_matrix} per l'assemblaggio iniziale flessibile, e \texttt{scipy.sparse.csc\_matrix} per la fattorizzazione e il calcolo algebrico.
-  \item Dati in virgola mobile \texttt{numpy.ndarray} per i tensori della soluzione fisica e del vettore dei termini noti $b$.
-  \item L'oggetto \texttt{Factor} di \texttt{CHOLMOD} (restituito da \texttt{scikit-sparse}), incapsulato per estrarre la matrice $L$ esplicita necessaria al testing.
-\end{itemize}
-
-\textbf{Complessità attesa.}
-Il fattore dominanate è la fattorizzazione di Cholesky: l'ordinamento naturale impone un fill-in $O(N^3)$ limitando la scalabilità. La \textit{Nested Dissection} riduce drasticamente l'occupazione di memoria a $O(N^2 \log N)$ e il tempo di fattorizzazione a un limite asintotico ottimale di $O(N^3)$ (rispetto a un generico problema denso).
+\subsubsection*{Logica implementativa (pseudo-codice)}
+\begin{verbatim}
+1. Per N in {32, 64, 128, 256, 512, 1024}:
+2.   Per ordering in {naturale, nested_dissection}:
+3.     Esegui pipeline C++ via subprocess
+4.     Leggi A.txt -> costruisci coo_matrix -> converti in csc_matrix
+5.     Leggi rhs.txt -> array numpy b
+6.     Avvia timer
+7.     factor = cholesky(-A, order="natural")
+8.     L = csc_matrix(factor[0])
+9.     y = spsolve_triangular(L, b, lower=True)   # forward
+10.    u = spsolve_triangular(L.T, y, lower=False) # backward
+11.    Ferma timer; registra tempo e nnz(L)
+12. Genera grafici: spy plot, heatmap, superficie 3D, log-log benchmark
+\end{verbatim}
 
 % ------------------------------------------------------------
-\section{Analisi sperimentale (Task 5)}
+\newpage
+\section{Piano di validazione sperimentale}
 % ------------------------------------------------------------
 
-L'obiettivo dell'analisi sperimentale è quantificare sul campo il drastico vantaggio computazionale dell'ordinamento a \textit{Nested Dissection} contro il tradizionale approccio naturale. Il benchmark automatizzato esegue test su reti a grana progressivamente più fine, con $N \in \{32, 64, 128, 256, 512\}$.
+L'obiettivo della validazione è quantificare il vantaggio computazionale dell'ordinamento \textit{nested dissection} rispetto all'ordinamento naturale, e verificare la correttezza fisica della soluzione numerica.
 
-I risultati empirici registrati confermano la teoria in modo impressionante.
+\subsection*{Metriche di confronto}
+
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+\textbf{Metrica} & \textbf{Ordinamento naturale} & \textbf{Nested dissection} \\
+\midrule
+Fill-in \texttt{nnz(L)}   & $O(N^3)$          & $O(N^2 \log N)$ \\
+Tempo fattorizzazione      & $O(N^3)$          & $O(N^{2.5})$ (atteso) \\
+Larghezza di banda di $A$  & $\Theta(N)$       & $O(\sqrt{N^2}) = O(N)$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection*{Test di correttezza}
+
+\begin{itemize}
+  \item \textbf{Residuo relativo:} Per ogni $N$ testato, verificare $\|Au - b\|_2 / \|b\|_2 < 10^{-10}$.
+  \item \textbf{Soluzione esatta con $u_0 = x^2 - y^2$:} Poiché $\nabla^2(x^2-y^2) = 0$, con $f = 0$ la soluzione numerica deve coincidere con $u_0$ fino agli errori di arrotondamento.
+  \item \textbf{Verifica della permutazione:} Il vettore \texttt{ordering} deve essere una permutazione valida di $\{0,\ldots,N^2-1\}$.
+\end{itemize}
+
+\subsection*{Test di scalabilità}
+
+Il benchmark viene eseguito per $N \in \{32, 64, 128, 256, 512\}$ (e $N=1024$ se le risorse lo consentono). I risultati attesi sono visualizzati in scala log-log:
 
 \begin{figure}[H]
   \centering
-  \includegraphics[width=0.9\textwidth]{../output/benchmark_loglog.png}
-  \caption{Grafico in scala log-log del numero di elementi non-zero (fill-in) di $L$ e del tempo computazionale di fattorizzazione, con e senza riordinamento.}
+  \includegraphics[width=0.88\textwidth]{../output/benchmark_loglog.png}
+  \caption{Scala log-log di \texttt{nnz(L)} e tempo di fattorizzazione al variare di $N$, con e senza riordinamento.}
   \label{fig:benchmark}
 \end{figure}
 
-Come visibile in Figura \ref{fig:benchmark}, il numero di ingressi non nulli per il fattore di Cholesky $L$, denotato come \texttt{nnz(L)}, mostra due curve con andamenti divergenti:
-\begin{itemize}
-    \item L'ordinamento \textbf{naturale} denota una rampa rettilinea in piano bilogaritmico, la cui forte pendenza rispecchia chiaramente la crescita $O(N^3)$ del fill-in.
-    \item L'ordinamento a \textbf{nested dissection} abbatte visibilmente questa crescita. L'andamento curvo più "piatto" traccia la funzione limite asintotica formale $O(N^2 \log N)$.
-\end{itemize}
+Come visibile in Figura~\ref{fig:benchmark}, il numero di entrate non nulle nel fattore $L$ mostra due andamenti divergenti: l'ordinamento naturale segue la pendenza $O(N^3)$, mentre la nested dissection segue la pendenza più piatta $O(N^2 \log N)$, con un risparmio che diventa dominante per $N \ge 128$.
 
-Lo stesso risparmio monumentale si riflette sui tempi di computazione: a $N=512$, il tempo richiesto dal solver senza ordinamento schizza rapidamente verso l'alto (a causa di un enorme sovraccarico in cache per le dipendenze dense sparse), mentre per la nested dissection il solutore chiude l'operazione in frazioni di secondo.
+\subsection*{Visualizzazioni}
 
-\subsection{Visualizzazioni Topologiche e Fisiche}
-
-Per avere un check visivo dell'equazione differenziale risolta, il notebook esporta non solo gli spy-plot strutturali. Ho esteso le funzionalità fornendo due strumenti di validazione:
 \begin{enumerate}
-    \item \textbf{Mappe di calore e Superfici 3D:} L'array 1D della soluzione calcolata $u$ viene rimappato su una mesh $N \times N$. Tramite l'uso della \textit{inferno colormap}, la mappa di calore 2D e la proiezione tridimensionale con \texttt{plot\_surface} validano la fisicità del modello termico (in particolar modo per test complessi come la funzione $u_0 = \sin(\pi x)$ che disperde il calore verso il "nucleo freddo" centrale del quadrato).
-    \item \textbf{Spy Plots}: La matrice triangolare inferiore $L$ generata dalla fattorizzazione è soggetta allo strumento \texttt{spy} di Matplotlib per $N=32$, rendendo immediatamente evidenti all'occhio i pattern del fill-in: un blocco pieno per l'ordinamento naturale, una struttura elegantemente sparsa a blocchi vuoti per la \textit{nested dissection}.
+  \item \textbf{Spy plot:} Struttura di sparsità della matrice $A$ e del fattore $L$ per $N=32$, per entrambi gli ordinamenti. Si deve osservare un blocco quasi-pieno per l'ordinamento naturale e una struttura a blocchi sparsi per la nested dissection.
+  \item \textbf{Mappa di calore e superficie 3D:} La soluzione $u(x,y)$ deve mostrare un picco di temperatura in prossimità dell'angolo $(0,0)$, dove la sorgente gaussiana è concentrata, con decadimento verso i bordi freddi.
 \end{enumerate}
 
 % ============================================================
