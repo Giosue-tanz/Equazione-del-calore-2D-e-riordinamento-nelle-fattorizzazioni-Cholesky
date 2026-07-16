@@ -1,16 +1,36 @@
+// ============================================================
+//  task1_grid.cpp
+//  Modulo 1 — Generazione della griglia e del grafo di adiacenza
+//
+//  Genera la struttura geometrica del dominio discretizzato e il
+//  relativo grafo di adiacenza della griglia N×N.
+//
+//  Parametri geometrici:
+//    - Dominio: [0,1]^2
+//    - Passo: h = 1/(N+1)
+//    - Nodi interni: N^2,  ID φ(i,j) = (i-1)*N + (j-1)
+//
+//  Output (in output/):
+//    - coords.txt       — una riga per nodo: "id i j x y"
+//    - connectivity.txt — una riga per arco: "u v" con u < v
+//
+//  Uso: ./task1_grid <N>
+// ============================================================
+
 #include <iostream>
 #include <fstream>
 #include <vector>
 #include <string>
 #include <cstdlib>
 #include <iomanip>
-#include <chrono>   // [MIGLIORAMENTO] benchmark tempi come nel codice del prof (qs.cpp)
+#include <sys/stat.h>
 
 using namespace std;
-using namespace chrono;
 
-// Funzione per calcolare l'identificatore univoco del nodo a partire dagli indici (i, j)
-// i, j vanno da 1 a N.
+// Cartella di output condivisa con gli altri task
+static const string OUTPUT_DIR = "output/";
+
+// Calcola l'ID naturale del nodo (i, j) con i,j in [1..N]
 inline int getNodeId(int i, int j, int N) {
     return (i - 1) * N + (j - 1);
 }
@@ -30,52 +50,39 @@ int main(int argc, char* argv[]) {
 
     int num_nodes = N * N;
 
-    // --- Generazione Nodi (coords.txt) ---
-    // [MIGLIORAMENTO] misurazione del tempo con chrono (tecnica dal codice del prof)
-    auto start_coords = high_resolution_clock::now();
+    // Crea la directory output/ se non esiste
+    mkdir(OUTPUT_DIR.c_str(), 0755);
 
-    ofstream coords_file("coords.txt");
+    // ── Generazione Nodi (coords.txt) ────────────────────────────────────────
+    ofstream coords_file(OUTPUT_DIR + "coords.txt");
     if (!coords_file.is_open()) {
-        cerr << "Errore: impossibile creare coords.txt" << endl;
+        cerr << "Errore: impossibile creare " << OUTPUT_DIR << "coords.txt" << endl;
         return 1;
     }
 
-    // Impostiamo la precisione per la stampa delle coordinate
+    // Formato: id i j x y  (x = i/(N+1), y = j/(N+1))
     coords_file << fixed << setprecision(8);
 
     for (int i = 1; i <= N; ++i) {
         for (int j = 1; j <= N; ++j) {
-            int n = getNodeId(i, j, N);
+            int n  = getNodeId(i, j, N);
             double x = (double)i / (N + 1);
             double y = (double)j / (N + 1);
-            
-            // Formato: n i j x y
             coords_file << n << " " << i << " " << j << " " << x << " " << y << "\n";
         }
     }
     coords_file.close();
 
-    auto end_coords = high_resolution_clock::now();
-    duration<double, milli> tempo_coords = end_coords - start_coords;
-
-    // --- Generazione Grafo di Adiacenza (connectivity.txt) ---
-    // [MIGLIORAMENTO] misurazione del tempo con chrono (tecnica dal codice del prof)
-    auto start_conn = high_resolution_clock::now();
-
-    // Usiamo una lista di adiacenza come richiesto dal documento di progetto
+    // ── Generazione Grafo di Adiacenza (connectivity.txt) ────────────────────
+    // Lista di adiacenza bidirezionale; nel file finale scriviamo solo u < v.
     vector<vector<int>> adj_list(num_nodes);
-    for (int i = 0; i < num_nodes; ++i) {
-        adj_list[i].reserve(4); // Al massimo 4 vicini per ogni nodo interno
-    }
+    for (int i = 0; i < num_nodes; ++i)
+        adj_list[i].reserve(4); // al massimo 4 vicini per nodo interno
 
     for (int i = 1; i <= N; ++i) {
         for (int j = 1; j <= N; ++j) {
             int u = getNodeId(i, j, N);
 
-            // Per evitare duplicati e mantenere u < v nel file finale, 
-            // basta guardare in avanti (destra e alto) per popolare gli archi non orientati.
-            // Aggiungiamo comunque l'arco in entrambe le direzioni nella lista di adiacenza.
-            
             // Vicino in alto (i, j+1)
             if (j < N) {
                 int v_top = getNodeId(i, j + 1, N);
@@ -92,32 +99,25 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    // Scriviamo gli archi su connectivity.txt (solo u < v)
-    ofstream conn_file("connectivity.txt");
+    ofstream conn_file(OUTPUT_DIR + "connectivity.txt");
     if (!conn_file.is_open()) {
-        cerr << "Errore: impossibile creare connectivity.txt" << endl;
+        cerr << "Errore: impossibile creare " << OUTPUT_DIR << "connectivity.txt" << endl;
         return 1;
     }
 
+    int edge_id = 0;
     for (int u = 0; u < num_nodes; ++u) {
         for (int v : adj_list[u]) {
             if (u < v) {
-                conn_file << u << " " << v << "\n";
+                conn_file << edge_id++ << " " << u << " " << v << "\n";
             }
         }
     }
     conn_file.close();
 
-    auto end_conn = high_resolution_clock::now();
-    duration<double, milli> tempo_conn = end_conn - start_conn;
-
     cout << "Griglia e grafo generati con successo per N = " << N << "." << endl;
-    cout << "File creati: coords.txt, connectivity.txt" << endl;
-    cout << "\n=== BENCHMARK ==" << endl;
-    cout << fixed << setprecision(3);
-    cout << "  Generazione coords.txt  : " << tempo_coords.count() << " ms" << endl;
-    cout << "  Generazione connectivity : " << tempo_conn.count()   << " ms" << endl;
-    cout << "  Totale                  : " << (tempo_coords + tempo_conn).count() << " ms" << endl;
+    cout << "File creati: " << OUTPUT_DIR << "coords.txt, "
+         << OUTPUT_DIR << "connectivity.txt" << endl;
 
     return 0;
 }

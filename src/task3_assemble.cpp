@@ -30,11 +30,10 @@
 #include <cmath>
 #include <string>
 #include <iomanip>
-#include <chrono>
+#include <iomanip>
 #include <sys/stat.h>
 
 using namespace std;
-using namespace chrono;
 
 // Cartella di output (stessa degli altri task)
 static const string OUTPUT_DIR = "output/";
@@ -144,7 +143,6 @@ int main(int argc, char* argv[]) {
     // 2. Lettura di coords.txt — coordinate dei nodi interni
     //    Formato: id riga colonna x y
     // --------------------------------------------------------
-    auto t_inizio_lettura = high_resolution_clock::now();
 
     struct NodeCoord {
         int id;
@@ -181,8 +179,6 @@ int main(int argc, char* argv[]) {
         }
     }
     file_coords.close();
-
-    auto t_fine_lettura_coords = high_resolution_clock::now();
 
     // --------------------------------------------------------
     // 3. Lettura di ordering.txt (solo se --reorder)
@@ -227,15 +223,12 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    auto t_fine_lettura_ordering = high_resolution_clock::now();
-
     // --------------------------------------------------------
     // 4. Assemblaggio della matrice A e del vettore b
     //    Iteriamo sui nodi nel NUOVO ordinamento (k = 0..N^2-1).
     //    Per ogni k ricaviamo l'old_id = perm[k] e da esso le
     //    coordinate geometriche (i, j, x, y).
     // --------------------------------------------------------
-    auto t_inizio_assemblaggio = high_resolution_clock::now();
 
     // Pre-allochiamo: al più 5 entrate per nodo (diagonale + 4 vicini)
     // Il file A.txt e' simmetrico: ogni coppia (k, k') con k != k' compare due volte
@@ -286,12 +279,9 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    auto t_fine_assemblaggio = high_resolution_clock::now();
-
     // --------------------------------------------------------
     // 5. Scrittura di A.txt — tripli (i, j, val)
     // --------------------------------------------------------
-    auto t_inizio_scrittura = high_resolution_clock::now();
 
     ofstream file_A(OUTPUT_DIR + "A.txt");
     if (!file_A.is_open()) {
@@ -318,16 +308,9 @@ int main(int argc, char* argv[]) {
     }
     file_rhs.close();
 
-    auto t_fine_scrittura = high_resolution_clock::now();
-
     // --------------------------------------------------------
     // 7. Riepilogo e benchmark
     // --------------------------------------------------------
-    duration<double, milli> tempo_coords    = t_fine_lettura_coords    - t_inizio_lettura;
-    duration<double, milli> tempo_ordering  = t_fine_lettura_ordering  - t_fine_lettura_coords;
-    duration<double, milli> tempo_assembl   = t_fine_assemblaggio      - t_inizio_assemblaggio;
-    duration<double, milli> tempo_scrittura = t_fine_scrittura         - t_inizio_scrittura;
-    duration<double, milli> tempo_totale    = t_fine_scrittura         - t_inizio_lettura;
 
     cout << "Assemblaggio completato con successo." << endl;
     cout << "  N                  : " << N << endl;
@@ -338,14 +321,6 @@ int main(int argc, char* argv[]) {
     cout << "  Condizione bordo   : [" << scelta_bordo << "] " << nomi_bordo[scelta_bordo] << endl;
     cout << "  Entrate in A.txt   : " << triplets.size()
          << "  (attese: " << num_nodi + 4LL * num_nodi << " max)" << endl;
-    cout << "\n=== TEMPI DI ESECUZIONE (BENCHMARK) ===" << endl;
-    cout << fixed << setprecision(3);
-    cout << "  Lettura coords.txt   : " << tempo_coords.count()    << " ms" << endl;
-    if (usa_reorder)
-    cout << "  Lettura ordering.txt : " << tempo_ordering.count()  << " ms" << endl;
-    cout << "  Assemblaggio matrice : " << tempo_assembl.count()   << " ms" << endl;
-    cout << "  Scrittura A+rhs.txt  : " << tempo_scrittura.count() << " ms" << endl;
-    cout << "  Tempo Totale         : " << tempo_totale.count()    << " ms" << endl;
 
     return 0;
 }

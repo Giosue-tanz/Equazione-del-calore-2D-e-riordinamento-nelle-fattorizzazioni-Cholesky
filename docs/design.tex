@@ -154,20 +154,22 @@ Poiché $-A$ è simmetrica definita positiva (SPD), si calcola la fattorizzazion
 
 Con l'ordinamento naturale per righe la larghezza di banda di $A$ è $\Theta(N)$ e il fill-in di $L$ è $O(N^3)$. La tecnica di \emph{nested dissection} riduce il fill-in a $O(N^2 \log N)$, con un risparmio sostanziale per valori grandi di $N$.
 
-\subsection*{Grafo di adiacenza e nested dissection}
+\subsection*{Nested dissection: approccio geometrico}
 
 La struttura di $A$ è codificata dal \emph{grafo di adiacenza} $G = (V, E)$: ogni nodo $v \in V$ corrisponde a una variabile $u_{i,j}$ e ogni arco $(u,v) \in E$ indica che $A_{uv} \neq 0$. Per la griglia regolare:
 \[
-  (x_i, y_j) \leftrightarrow (x_k, y_l) \iff (i=k,\, |j-l|=1) \;\text{ oppure }\; (j=l,\, |i-k|=1).
+  (x_i, y_j) \leftrightarrow (x_k, y_l) \iff (i=k,\, |j-l|=1) \;\text{ oppure }\; (j=l,\, |i-k||=1).
 \]
 
-La \emph{nested dissection} individua ricorsivamente un separatore geometrico $V_S$ che divide $V$ in due insiemi bilanciati $V_1$ e $V_2$ senza archi diretti tra loro. L'ordinamento risultante elenca prima $V_1$, poi $V_2$, infine $V_S$, in modo che il separatore appaia in fondo alla matrice, limitando la propagazione del fill-in. Per la griglia regolare il separatore ottimale è la colonna mediana: scelto $\hat{x}$ mediano, si pone:
+La \emph{nested dissection} individua ricorsivamente un separatore $V_S$ che divide $V$ in due insiemi bilanciati $V_1$ e $V_2$ senza archi diretti tra loro. L'ordinamento risultante elenca prima $V_1$, poi $V_2$, infine $V_S$, in modo che il separatore appaia in fondo alla matrice, limitando la propagazione del fill-in.
+
+In questo progetto si adotta un \textbf{approccio geometrico puro}: il separatore non è determinato esplorando il grafo di adiacenza, bensì è definito direttamente tramite le coordinate spaziali dei nodi. Scelto l'asse di taglio $c \in \{x, y\}$ e calcolato l'indice mediano $\hat{c}$, si pone:
 \[
-  V_1 = \{u_{i,j}\mid x_i < \hat{x}\},\quad
-  V_2 = \{u_{i,j}\mid x_i > \hat{x}\},\quad
-  V_S = \{u_{i,j}\mid x_i = \hat{x}\}.
+  V_1 = \{u_{i,j}\mid c < \hat{c}\},\quad
+  V_2 = \{u_{i,j}\mid c > \hat{c}\},\quad
+  V_S = \{u_{i,j}\mid c = \hat{c}\}.
 \]
-Il procedimento viene applicato ricorsivamente a $V_1$ e $V_2$, alternando il taglio lungo $x$ e $y$.
+Il procedimento viene applicato ricorsivamente a $V_1$ e $V_2$, alternando il taglio lungo $x$ e $y$. Per griglie cartesiane regolari, il piano mediano è \emph{al contempo} un separatore geometrico e un separatore topologico del grafo: non esistono archi di adiacenza tra $V_1$ e $V_2$ (i punti sono separati da almeno un passo reticolare lungo l'asse di taglio), quindi l'approccio geometrico produce esattamente il medesimo separatore ottimale che si otterrebbe esplorando la topologia del grafo, senza il costo di tale esplorazione.
 
 % ------------------------------------------------------------
 \newpage
@@ -234,7 +236,9 @@ Il sistema viene concepito come un unico risolutore logico denominato \texttt{He
 \draw[arrfile] (T2.east) -- (F2.west);
 \draw[arrfile] (T3.east) -- (F3.west);
 
-\draw[arrfile] (F1.south) -- ++(0,-0.35) -| ([xshift=1.0cm]T2.east) -- (T2.east);
+% Task2 legge SOLO coords.txt (approccio geometrico puro)
+\draw[arrfile] (F1.south) -- ++(0,-0.20) -| ([xshift=1.0cm]T2.east)
+  node[midway, above, font=\tiny\itshape, text=black!50] {coords.txt} -- (T2.east);
 \draw[arrfile] (F2.south) -- ++(0,-0.35) -| ([xshift=1.0cm]T3.east) -- (T3.east);
 \draw[arrfile] (F3.south) -- ++(0,-0.35) -| ([xshift=1.0cm]NB.east)  -- (NB.east);
 
@@ -254,8 +258,10 @@ Il sistema viene concepito come un unico risolutore logico denominato \texttt{He
 \noindent Le strutture dati fondamentali dell'intero sistema sono:
 
 \begin{itemize}
-  \item \textbf{Liste di adiacenza} (\texttt{std::vector<std::vector<int>>}) per la rappresentazione del grafo nei moduli C++.
-  \item \textbf{Vettori di permutazione} (\texttt{std::vector<int>}) per la mappatura tra ordinamento naturale e riordinato.
+  \item \textbf{Liste di adiacenza} (\texttt{std::vector<std::vector<int>>}) nel Modulo 1 per la costruzione e scrittura del grafo di adiacenza.
+  \item \textbf{Vettore di nodi geometrici} (\texttt{std::vector<Node>}) nel Modulo 2: \texttt{struct Node} contiene \texttt{id, i, j, x, y}; consente la nested dissection geometrica senza caricare in memoria la lista di adiacenza.
+  \item \textbf{Stack esplicito} (\texttt{std::stack<StackItem>}) nel Modulo 2: sostituisce la ricorsione, evitando stack overflow su griglie $N \gg 1000$.
+  \item \textbf{Vettori di permutazione} (\texttt{std::vector<int>} \texttt{perm}, \texttt{inv\_perm}) per la mappatura bidirezionale tra ordinamento naturale e riordinato.
   \item \textbf{Formato sparso CSC} (\texttt{scipy.sparse.csc\_matrix}) per la matrice $A$ nel modulo Python, richiesto nativamente da CHOLMOD.
 \end{itemize}
 
@@ -290,7 +296,7 @@ Ogni nodo interno ha al massimo 4 vicini (sinistra, destra, basso, alto). A ogni
   \item \textbf{Output:}
     \begin{itemize}
       \item \texttt{output/coords.txt} -- una riga per nodo: \texttt{id i j x y}
-      \item \texttt{output/connectivity.txt} -- una riga per arco: \texttt{u v} con $u < v$
+      \item \texttt{output/connectivity.txt} -- una riga per arco: \texttt{e u v} (dove \texttt{e} è l'indice progressivo dell'arco e $u < v$)
     \end{itemize}
   \item \textbf{Funzionalità richieste:}
     \begin{itemize}
@@ -322,61 +328,87 @@ Ogni nodo interno ha al massimo 4 vicini (sinistra, destra, basso, alto). A ogni
 8.      Se j < N: aggiungi arco bidirezionale (id, id+1)
 9.      Se i < N: aggiungi arco bidirezionale (id, id+N)
 10. Per ogni nodo u, per ogni vicino v:
-11.   Se u < v: scrivi (u, v) su connectivity.txt
+11.   Se u < v: scrivi (e++, u, v) su connectivity.txt
 \end{verbatim}
 
 % ---- Modulo 2 -----------------------------------------------
-\subsection*{Modulo 2 -- \texttt{task2\_reorder.cpp}: nested dissection}
+\subsection*{Modulo 2 -- \texttt{task2\_reorder.cpp}: nested dissection geometrica}
 
-Il Modulo 2 costituisce il cuore algoritmico del progetto. Calcola una permutazione ottimizzata dei nodi tramite l'euristica della \textit{nested dissection}, al fine di minimizzare il fill-in durante la fattorizzazione di Cholesky.
+Il Modulo 2 costituisce il cuore algoritmico del progetto. Calcola una permutazione ottimizzata dei nodi tramite la \textit{nested dissection geometrica}, al fine di minimizzare il fill-in durante la fattorizzazione di Cholesky.
+
+\subsubsection*{Approccio geometrico vs.\ approccio su grafo}
+
+Esistono due famiglie di algoritmi per la nested dissection:
+
+\begin{enumerate}
+  \item \textbf{Approccio su grafo} (es.\ bisection spettrale, METIS): esplora esplicitamente il grafo di adiacenza $G=(V,E)$, calcola autovettori del Laplaciano o partiziona tramite BFS/Kernighan--Lin. Richiede $O(|E|) = O(N^2)$ solo per costruire e visitare il grafo, più il costo delle euristiche di partizionamento (generalmente $O(N^2 \alpha(N))$ con $\alpha$ lenta ma non banale). Tali metodi sono necessari per griglie non strutturate o domini irregolari.
+  
+  \item \textbf{Approccio geometrico} (adottato in questo progetto): ignora completamente la lista di adiacenza. Il separatore viene individuato tramite il \emph{piano mediano} sull'asse corrente: dati gli indici interi $(i, j)$ dei nodi, si calcola $\hat{c} = \lfloor(\min_c + \max_c)/2\rfloor$ e si partiziona $V_S = \{v \mid c_v = \hat{c}\}$, $V_1 = \{v \mid c_v < \hat{c}\}$, $V_2 = \{v \mid c_v > \hat{c}\}$.
+\end{enumerate}
+
+\paragraph{Perché l'approccio geometrico è superiore per griglie regolari.}
+Per una griglia cartesiana uniforme $N \times N$ l'approccio geometrico è \emph{equivalente} a quello su grafo in termini di qualità del separatore, ma \emph{superiore} sotto ogni aspetto implementativo:
+
+\begin{itemize}
+  \item \textbf{Correttezza del separatore}: il piano mediano $c = \hat{c}$ divide la griglia in due metà con al massimo $\lceil N/2 \rceil$ nodi ciascuna. Non esistono archi di adiacenza tra $V_1$ e $V_2$ (i nodi adiacenti si trovano a distanza reticolare $h$ lungo l'asse di taglio, quindi il nodo con $c = \hat{c}$ funge da buffer). Il separatore geometrico \emph{coincide} esattamente con il separatore topologico del grafo.
+  \item \textbf{Complessità}: $\mathcal{O}(N^2 \log N)$ deterministico, senza euristiche. L'approccio su grafo richiede almeno $O(N^2)$ per la sola lettura degli archi, più il costo dell'algoritmo di partizionamento.
+  \item \textbf{Efficienza in cache}: accesso sequenziale al solo vettore di nodi (\texttt{coords.txt} → \texttt{std::vector<Node>}), nessuna lista di puntatori per adiacenze.
+  \item \textbf{Semplicità e verificabilità}: l'invariante ``$V_S$ è il piano mediano'' è dimostrabile analiticamente; l'invariante di un separatore trovato per BFS su grafo non strutturato richiede verifica sperimentale.
+  \item \textbf{Robustezza}: utilizzo di confronti su indici interi ($(i,j)$) anziché coordinate floating-point, eliminando i rischi di arrotondamento.
+\end{itemize}
 
 \subsubsection*{Formalizzazione matematica}
 
-L'algoritmo opera sul grafo $G = (V,E)$ e individua ricorsivamente un separatore $V_S \subset V$ che partiziona $V$ in tre insiemi disgiunti senza archi tra $V_1$ e $V_2$:
+L'algoritmo riceve in input il vettore $S$ di nodi con coordinate intere $(i,j)$ e reali $(x,y)$, e individua ricorsivamente:
 \begin{align*}
-  V_1 &= \{ (x_i, y_j) \in S \mid c < \hat{c} \} \\
-  V_2 &= \{ (x_i, y_j) \in S \mid c > \hat{c} \} \\
-  V_S &= \{ (x_i, y_j) \in S \mid c = \hat{c} \}
+  V_1 &= \{ u \in S \mid c_u < \hat{c} \} \\
+  V_2 &= \{ u \in S \mid c_u > \hat{c} \} \\
+  V_S &= \{ u \in S \mid c_u = \hat{c} \}
 \end{align*}
-dove $c \in \{x, y\}$ è la coordinata dell'asse di taglio e $\hat{c}$ è il valore mediano. L'ordinamento risultante è $V_1 \to V_2 \to V_S$, applicato ricorsivamente alternando gli assi.
+dove $c \in \{i, j\}$ è l'indice dell'asse di taglio e $\hat{c} = \lfloor (\min_{u \in S} c_u + \max_{u \in S} c_u)/2 \rfloor$. L'ordinamento risultante è $V_1 \to V_2 \to V_S$, ricorsivo con alternanza degli assi.
 
 \subsubsection*{Specifiche}
 
 \begin{itemize}
-  \item \textbf{Input:} \texttt{output/coords.txt} e \texttt{output/connectivity.txt} (prodotti dal Modulo 1).
-  \item \textbf{Output:} \texttt{output/ordering.txt} -- una riga per posizione: \texttt{nuova\_pos vecchio\_id}
+  \item \textbf{Input:} \texttt{output/coords.txt} (prodotto dal Modulo~1). Il file \texttt{connectivity.txt} \emph{non viene letto}: per l'approccio geometrico la struttura topologica del grafo è ridondante.
+  \item \textbf{Output:} \texttt{output/ordering.txt} -- una riga per posizione: \texttt{new\_id old\_id}
   \item \textbf{Funzionalità richieste:}
     \begin{itemize}
-      \item Lettura delle coordinate e caricamento del grafo.
-      \item Partizionamento iterativo tramite stack esplicito (per evitare stack overflow su griglie grandi).
-      \item Calcolo della mediana geometrica con alternanza degli assi $x$/$y$ ad ogni livello.
+      \item Lettura delle sole coordinate da \texttt{coords.txt}.
+      \item Partizionamento iterativo tramite \texttt{std::stack<StackItem>} in heap (evita stack overflow per $N \gg 1000$).
+      \item Calcolo del piano mediano con indici interi, con alternanza degli assi $i$/$j$ ad ogni livello.
+      \item Verifica dell'invariante: \texttt{ordering.size() == N\textsuperscript{2}}.
       \item Salvataggio dell'ordinamento su \texttt{ordering.txt}.
     \end{itemize}
-  \item \textbf{Strutture dati:} \texttt{struct Node \{id, i, j, x, y\}}; \texttt{struct StackItem \{vector<Node>, axis, is\_separator\}}; \texttt{std::stack<StackItem>} allocato sull'heap; \texttt{std::vector<int> ordering} di dimensione $N^2$.
+  \item \textbf{Strutture dati:} \texttt{struct Node \{id, i, j, x, y\}}; \texttt{struct StackItem \{vector<Node> S, int axis, bool is\_separator\}}; \texttt{std::stack<StackItem>}; \texttt{std::vector<int> ordering}.
   \item \textbf{Invarianti:}
     \begin{itemize}
-      \item Il vettore \texttt{ordering} è una permutazione valida di $\{0, \dots, N^2-1\}$: ogni indice compare esattamente una volta.
-      \item I nodi del separatore $V_S$ compaiono sempre \emph{dopo} i nodi di $V_1$ e $V_2$ alla stessa profondità di ricorsione.
-      \item L'asse di taglio si alterna ad ogni livello (0=X, 1=Y).
+      \item Il vettore \texttt{ordering} è una permutazione valida di $\{0, \dots, N^2-1\}$.
+      \item I nodi di $V_S$ compaiono sempre \emph{dopo} i nodi di $V_1$ e $V_2$ alla stessa profondità.
+      \item L'asse di taglio si alterna ad ogni livello (0 = $i$, 1 = $j$).
     \end{itemize}
-  \item \textbf{Dipendenze:} Modulo 1 (\texttt{coords.txt}, \texttt{connectivity.txt}).
+  \item \textbf{Dipendenze:} Modulo~1 (solo \texttt{coords.txt}).
   \item \textbf{Complessità attesa:} $\mathcal{O}(N^2 \log N)$ in tempo; $\mathcal{O}(N^2)$ in spazio.
 \end{itemize}
 
 \subsubsection*{Logica implementativa (pseudo-codice)}
 \begin{verbatim}
-1.  Carica nodi da coords.txt
-2.  Inizializza stack con (tutti i nodi, asse=X)
-3.  Finché stack non vuoto:
-4.    Estrai (Nodi, asse) dallo stack
-5.    Se |Nodi| == 1: aggiungi Nodi[0].id a ordering; continua
-6.    Calcola mediana mid = (min_coord + max_coord) / 2 lungo asse
-7.    Partiziona: V1 (coord < mid), V2 (coord > mid), VS (coord == mid)
-8.    Push nello stack (LIFO: V1 elaborato per primo):
-9.        push(VS, asse)           -- separatore, elaborato per ultimo
-10.       push(V2, 1 - asse)
-11.       push(V1, 1 - asse)
-12. Scrivi ordering.txt: per k = 0..N^2-1, scrivi (k, ordering[k])
+1.  Carica nodi da output/coords.txt -> vector<Node>
+2.  Inizializza stack con (tutti i nodi, asse=0)
+3.  Finche' lo stack non e' vuoto:
+4.    Estrai item = (S, asse, is_separator)
+5.    Se is_separator: aggiungi tutti i nodi di S a ordering; continua
+6.    Se |S| == 0: continua
+7.    Se |S| == 1: aggiungi S[0].id a ordering; continua
+8.    Calcola min_val, max_val su asse corrente (indice i o j)
+9.    mid_val = (min_val + max_val) / 2
+10.   Partiziona S in V1 (val<mid), V2 (val>mid), VS (val==mid)
+11.   next_axis = 1 - asse
+12.   Push (VS, asse,      true)   -- separatore: elaborato per ultimo
+13.   Push (V2, next_axis, false)
+14.   Push (V1, next_axis, false)  -- elaborata per prima (cima stack)
+15. Verifica: ordering.size() == nodes.size()
+16. Scrivi output/ordering.txt: per k=0..N^2-1, scrivi "k ordering[k]"
 \end{verbatim}
 
 % ---- Modulo 3 -----------------------------------------------
@@ -534,7 +566,7 @@ L'obiettivo della validazione è quantificare il vantaggio computazionale dell'o
 \textbf{Metrica} & \textbf{Ordinamento naturale} & \textbf{Nested dissection} \\
 \midrule
 Fill-in \texttt{nnz(L)}   & $O(N^3)$          & $O(N^2 \log N)$ \\
-Tempo fattorizzazione      & $O(N^3)$          & $O(N^{2.5})$ (atteso) \\
+Tempo fattorizzazione      & $O(N^4)$          & $O(N^3)$ \\
 Larghezza di banda di $A$  & $\Theta(N)$       & $O(\sqrt{N^2}) = O(N)$ \\
 \bottomrule
 \end{tabular}
@@ -550,7 +582,7 @@ Larghezza di banda di $A$  & $\Theta(N)$       & $O(\sqrt{N^2}) = O(N)$ \\
 
 \subsection*{Test di scalabilità}
 
-Il benchmark viene eseguito per $N \in \{32, 64, 128, 256, 512\}$ (e $N=1024$ se le risorse lo consentono). I risultati attesi sono visualizzati in scala log-log:
+Il benchmark viene eseguito per $N \in \{32, 64, 128, 256, 512, 1024\}$. I risultati ottenuti sono visualizzati in scala log-log:
 
 \begin{figure}[H]
   \centering
@@ -560,6 +592,8 @@ Il benchmark viene eseguito per $N \in \{32, 64, 128, 256, 512\}$ (e $N=1024$ se
 \end{figure}
 
 Come visibile in Figura~\ref{fig:benchmark}, il numero di entrate non nulle nel fattore $L$ mostra due andamenti divergenti: l'ordinamento naturale segue la pendenza $O(N^3)$, mentre la nested dissection segue la pendenza più piatta $O(N^2 \log N)$, con un risparmio che diventa dominante per $N \ge 128$.
+
+\textbf{Nota sui limiti hardware ($N=1024$):} Per il caso estremo $N=1024$ (circa un milione di incognite), l'algoritmo con ordinamento Naturale satura rapidamente la memoria RAM disponibile (richiedendo oltre 6.5 GB fisici per allocare il fattore $L$), sfociando di fatto in un blocco del sistema operativo per Out-Of-Memory. Pertanto, la curva dell'ordinamento Naturale si interrompe in Figura~\ref{fig:benchmark} a $N=512$. Questo ostacolo fisico tangibile evidenzia in modo inequivocabile la necessità ingegneristica di ricorrere ad algoritmi ottimali come la \textit{Nested Dissection}, che completa in meno di 10 secondi lo stesso problema da un milione di equazioni allocando una frazione trascurabile di RAM.
 
 \subsection*{Visualizzazioni}
 
