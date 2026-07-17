@@ -36,16 +36,31 @@ inline int getNodeId(int i, int j, int N) {
 }
 
 int main(int argc, char* argv[]) {
-    if (argc != 2) {
-        cerr << "Uso: " << argv[0] << " <N>" << endl;
-        cerr << "N: numero di nodi interni per lato (la griglia intera sara' (N+2)x(N+2))" << endl;
-        return 1;
+    int N = 0;
+    if (argc >= 2) {
+        try {
+            N = stoi(argv[1]);
+        } catch (...) {
+            N = 0;
+        }
     }
 
-    int N = stoi(argv[1]);
-    if (N <= 0) {
-        cerr << "Errore: N deve essere maggiore di 0." << endl;
-        return 1;
+    while (N <= 0) {
+        cout << "Inserire il numero di nodi interni per lato N (oppure digita 'q' per uscire): ";
+        string input_str;
+        if (!(cin >> input_str) || input_str == "q" || input_str == "Q") {
+            cout << "Uscita richiesta dall'utente." << endl;
+            return 0;
+        }
+        try {
+            N = stoi(input_str);
+            if (N <= 0) {
+                cerr << "Errore: N deve essere un intero maggiore di 0. Riprova." << endl;
+            }
+        } catch (...) {
+            cerr << "Errore: input non valido. Riprova." << endl;
+            N = 0;
+        }
     }
 
     int num_nodes = N * N;

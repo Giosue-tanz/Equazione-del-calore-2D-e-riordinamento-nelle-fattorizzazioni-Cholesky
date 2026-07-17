@@ -36,8 +36,8 @@ I moduli interagiscono in modo sequenziale attraverso file di testo intermedi ch
 
 1. Il **Modulo 1** produce i file `coords.txt` e `connectivity.txt`.
 2. Il **Modulo 2** legge tali file e genera il file `ordering.txt` contenente la sequenza riordinata dei nodi.
-3. Il **Modulo 3** utilizza sia le informazioni strutturali del grafo sia l'ordinamento per calcolare e produrre i file finali del sistema lineare, ossia `A.txt` e `rhs.txt`.
-4. Il **Modulo 4** acquisisce `A.txt` e `rhs.txt` per eseguire la computazione finale e l'analisi sperimentale.
+3. Il **Modulo 3** utilizza sia le informazioni strutturali del grafo sia l'ordinamento per calcolare e produrre i file finali del sistema lineare, ossia `A.txt` e `b.txt`.
+4. Il **Modulo 4** acquisisce `A.txt` e `b.txt` per eseguire la computazione finale e l'analisi sperimentale.
 
 ---
 

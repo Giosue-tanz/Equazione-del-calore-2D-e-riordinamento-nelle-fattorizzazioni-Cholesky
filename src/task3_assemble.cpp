@@ -21,7 +21,7 @@
 //
 //  Output:
 //      output/A.txt   — tripli (i, j, val) per ogni entrata non nulla (simmetrica)
-//      output/rhs.txt — vettore dei termini noti, uno per riga
+//      output/b.txt — vettore dei termini noti, uno per riga
 // ============================================================
 
 #include <iostream>
@@ -87,10 +87,19 @@ int main(int argc, char* argv[]) {
     // --------------------------------------------------------
     // 1. Parsing degli argomenti da riga di comando
     // --------------------------------------------------------
-    if (argc < 2 || argc > 3) {
-        cerr << "Uso: " << argv[0] << " <N> [--reorder]" << endl;
-        cerr << "  N         : numero di nodi interni per lato" << endl;
-        cerr << "  --reorder : usa l'ordinamento nested dissection da ordering.txt" << endl;
+    if (argc < 2 || argc > 4) {
+        cerr << "\n  Assembla il sistema lineare Au = b per l'equazione del calore 2D." << endl;
+        cerr << "\n  Uso:" << endl;
+        cerr << "    " << argv[0] << " <N> [--reorder]" << endl;
+        cerr << "\n  Argomenti:" << endl;
+        cerr << "    N           Dimensione della griglia: genera N^2 incognite interne" << endl;
+        cerr << "    --reorder   Applica l'ordinamento Nested Dissection (richiede ordering.txt)" << endl;
+        cerr << "                Se omesso, viene usato l'ordinamento naturale (lessicografico)" << endl;
+        cerr << "\n  Prerequisiti:" << endl;
+        cerr << "    task1 N           deve essere stato eseguito per produrre coords.txt" << endl;
+        cerr << "    task2 [--nd]      deve essere stato eseguito per produrre ordering.txt" << endl;
+        cerr << "\n  Esempio:" << endl;
+        cerr << "    " << argv[0] << " 64 --reorder" << endl << endl;
         return 1;
     }
 
@@ -101,13 +110,19 @@ int main(int argc, char* argv[]) {
     }
 
     bool usa_reorder = false;
-    if (argc == 3) {
-        string flag = argv[2];
+    int scelta_bordo = 0;
+    
+    for (int i = 2; i < argc; ++i) {
+        string flag = argv[i];
         if (flag == "--reorder") {
             usa_reorder = true;
         } else {
-            cerr << "Errore: flag non riconosciuto '" << flag << "'. Usa --reorder." << endl;
-            return 1;
+            try {
+                scelta_bordo = stoi(flag);
+            } catch (...) {
+                cerr << "Errore: flag non riconosciuto o numero invalido '" << flag << "'." << endl;
+                return 1;
+            }
         }
     }
 
@@ -117,7 +132,7 @@ int main(int argc, char* argv[]) {
     double coeff_fuori_diag = KAPPA / (h * h);          // entrata fuori diagonale
 
     // --------------------------------------------------------
-    // Menu interattivo: scelta della condizione al bordo
+    // Scelta della condizione al bordo
     // --------------------------------------------------------
     const string nomi_bordo[] = {
         "Omogenee          u0(x,y) = 0",
@@ -127,15 +142,16 @@ int main(int argc, char* argv[]) {
         "Armonica          u0(x,y) = x^2 - y^2",
         "Shock termico     u0(x,y) = 1 se y=1, 0 altrove"
     };
-    int scelta_bordo = 0;
-    cout << "\nCondizioni al bordo di Dirichlet:" << endl;
-    for (int i = 0; i <= 5; ++i)
-        cout << "  [" << i << "] " << nomi_bordo[i] << endl;
-    cout << "Scelta [0-5]: ";
-    if (!(cin >> scelta_bordo) || scelta_bordo < 0 || scelta_bordo > 5) {
-        cerr << "Errore: inserire un valore intero tra 0 e 5." << endl;
+
+    if (scelta_bordo < 0 || scelta_bordo > 5) {
+        cerr << "\n  Errore: inserire un numero di condizione al bordo valido come argomento [0-5]." << endl;
+        for (int i = 0; i <= 5; ++i) {
+            cerr << "    [" << i << "]  " << nomi_bordo[i] << endl;
+        }
         return 1;
     }
+    
+    cout << "\n  Condizioni al bordo di Dirichlet: [" << scelta_bordo << "] " << nomi_bordo[scelta_bordo] << endl;
 
     mkdir(OUTPUT_DIR.c_str(), 0755);
 
@@ -235,7 +251,7 @@ int main(int argc, char* argv[]) {
     vector<Triplet> triplets;
     triplets.reserve(5 * num_nodi);
 
-    vector<double> rhs(num_nodi, 0.0);
+    vector<double> b(num_nodi, 0.0);
 
     for (int k = 0; k < num_nodi; ++k) {
         int old_id = perm[k];           // nodo nel sistema naturale
@@ -250,7 +266,7 @@ int main(int argc, char* argv[]) {
 
         // --- Termine noto: b_k = -f(x_i, y_j) ---
         // (il segno meno viene dal fatto che lo stencil e' negativo e noi assembliamo Au=b)
-        rhs[k] = -f_sorgente(x, y);
+        b[k] = -f_sorgente(x, y);
 
         // --- Vicini e fuori diagonale ---
         // Direzioni: sinistra (i-1,j), destra (i+1,j), basso (i,j-1), alto (i,j+1)
@@ -264,10 +280,10 @@ int main(int argc, char* argv[]) {
             if (ni < 1 || ni > N || nj < 1 || nj > N) {
                 // Il vicino cade sul bordo: il suo valore e' noto (condizione di Dirichlet).
                 // Non entra nella matrice A, ma contribuisce al termine noto:
-                //   rhs[k] -= (kappa/h^2) * u0(x_bordo, y_bordo)
+                //   b[k] -= (kappa/h^2) * u0(x_bordo, y_bordo)
                 double x_bordo = ni * h;
                 double y_bordo = nj * h;
-                rhs[k] -= coeff_fuori_diag * get_u0(x_bordo, y_bordo, scelta_bordo);
+                b[k] -= coeff_fuori_diag * get_u0(x_bordo, y_bordo, scelta_bordo);
             } else {
                 // Vicino interno: calcola il suo old_id, poi il new_id
                 int old_id_vicino = id_naturale(ni, nj, N);
@@ -295,32 +311,33 @@ int main(int argc, char* argv[]) {
     file_A.close();
 
     // --------------------------------------------------------
-    // 6. Scrittura di rhs.txt — un valore per riga
+    // 6. Scrittura di b.txt — un valore per riga
     // --------------------------------------------------------
-    ofstream file_rhs(OUTPUT_DIR + "rhs.txt");
-    if (!file_rhs.is_open()) {
-        cerr << "Errore: impossibile creare " << OUTPUT_DIR << "rhs.txt" << endl;
+    ofstream file_b(OUTPUT_DIR + "b.txt");
+    if (!file_b.is_open()) {
+        cerr << "Errore: impossibile creare " << OUTPUT_DIR << "b.txt" << endl;
         return 1;
     }
-    file_rhs << fixed << setprecision(10);
+    file_b << fixed << setprecision(10);
     for (int k = 0; k < num_nodi; ++k) {
-        file_rhs << rhs[k] << "\n";
+        file_b << b[k] << "\n";
     }
-    file_rhs.close();
+    file_b.close();
 
     // --------------------------------------------------------
     // 7. Riepilogo e benchmark
     // --------------------------------------------------------
 
-    cout << "Assemblaggio completato con successo." << endl;
-    cout << "  N                  : " << N << endl;
-    cout << "  Nodi interni (N^2) : " << num_nodi << endl;
-    cout << "  Passo h            : " << h << endl;
-    cout << "  kappa              : " << KAPPA << endl;
-    cout << "  Ordinamento        : " << (usa_reorder ? "Nested Dissection (--reorder)" : "Naturale") << endl;
-    cout << "  Condizione bordo   : [" << scelta_bordo << "] " << nomi_bordo[scelta_bordo] << endl;
-    cout << "  Entrate in A.txt   : " << triplets.size()
-         << "  (attese: " << num_nodi + 4LL * num_nodi << " max)" << endl;
+    cout << "\n  Assemblaggio completato." << endl;
+    cout << "  " << string(52, '-') << endl;
+    cout << "    Dimensione griglia    N  = " << N << "  (" << num_nodi << " incognite)" << endl;
+    cout << "    Passo spaziale        h  = " << h << endl;
+    cout << "    Diffusivita' termica  k  = " << KAPPA << endl;
+    cout << "    Ordinamento           :  " << (usa_reorder ? "Nested Dissection" : "Naturale (lessicografico)") << endl;
+    cout << "    Condizione al bordo   :  [" << scelta_bordo << "] " << nomi_bordo[scelta_bordo] << endl;
+    cout << "    Entrate scritte (A)   :  " << triplets.size() << endl;
+    cout << "  " << string(52, '-') << endl;
+    cout << "  File prodotti: A.txt, b.txt  ->  cartella output/" << endl << endl;
 
     return 0;
 }

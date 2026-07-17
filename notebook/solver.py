@@ -37,8 +37,8 @@ def read_A(path):
     return A.tocsc()
 
 
-def read_rhs(path):
-    """Legge il vettore termine noto b da rhs.txt."""
+def read_b(path):
+    """Legge il vettore termine noto b da b.txt."""
     return np.loadtxt(path)
 
 
@@ -106,7 +106,7 @@ print("Funzione solve definita.")
 # ── Cella 4 — Test con N=4 (output già presenti) ──────────────────────────────
 
 A = read_A(OUTPUT / "A.txt")
-b = read_rhs(OUTPUT / "rhs.txt")
+b = read_b(OUTPUT / "b.txt")
 xs, ys = read_coords(OUTPUT / "coords.txt")
 
 print(f"Dimensione A: {A.shape}, nnz(A) = {A.nnz}")
@@ -186,7 +186,7 @@ def run_pipeline(N, use_reorder, bordo=0):
     """
     # task1: genera griglia
     subprocess.run(
-        [str(ROOT / "task1_grid"), str(N)],
+        [str(ROOT / "task1"), str(N)],
         cwd=str(ROOT),
         capture_output=True, text=True, check=True
     )
@@ -194,25 +194,31 @@ def run_pipeline(N, use_reorder, bordo=0):
     # task2: riordina (solo se richiesto)
     if use_reorder:
         subprocess.run(
-            [str(ROOT / "task2_reorder")],
+            [str(ROOT / "task2")],
             cwd=str(ROOT),
             capture_output=True, text=True, check=True
         )
 
-    # task3: assembla — stdin: scelta_bordo
-    cmd = [str(ROOT / "task3_assemble"), str(N)]
+    # task3: assembla — N, --reorder, scelta_bordo
+    cmd = [str(ROOT / "task3"), str(N)]
     if use_reorder:
         cmd.append("--reorder")
-        
-    stdin_input = f"{bordo}\n"
+    cmd.append(str(bordo))
+    
     subprocess.run(
         cmd,
-        input=stdin_input,
         cwd=str(ROOT),
         capture_output=True, text=True, check=True
     )
+    
+    # [SANITY CHECK] Integrità della permutazione
+    if use_reorder:
+        ordering = np.loadtxt(ROOT / "output/ordering.txt", dtype=int)
+        assert len(np.unique(ordering)) == len(ordering) == N*N, "Permutazione invalida!"
+
 
 compile_all()
+
 
 # ── Cella 8 — Benchmark Task 5 ────────────────────────────────────────────────
 #
@@ -250,7 +256,7 @@ for N in Ns:
 
         # Leggi
         A_bench = read_A(OUTPUT / "A.txt")
-        b_bench = read_rhs(OUTPUT / "rhs.txt")
+        b_bench = read_b(OUTPUT / "b.txt")
 
         results[label]["nnz_A"].append(A_bench.nnz)
 
@@ -349,7 +355,7 @@ for col, (label, use_reorder, color) in enumerate([
 ]):
     run_pipeline(32, use_reorder, bordo=0)
     A32 = read_A(OUTPUT / "A.txt")
-    b32 = read_rhs(OUTPUT / "rhs.txt")
+    b32 = read_b(OUTPUT / "b.txt")
     neg_A32 = (-A32).tocsc()
     L32 = my_cholesky(neg_A32)
 
@@ -370,7 +376,7 @@ print("Salvato: output/spy_N32_comparison.png")
 
 run_pipeline(32, use_reorder=True, bordo=3)   # bordo = sin(π x)
 A32 = read_A(OUTPUT / "A.txt")
-b32 = read_rhs(OUTPUT / "rhs.txt")
+b32 = read_b(OUTPUT / "b.txt")
 xs32, ys32 = read_coords(OUTPUT / "coords.txt")
 
 u32, _ = solve(A32, b32)

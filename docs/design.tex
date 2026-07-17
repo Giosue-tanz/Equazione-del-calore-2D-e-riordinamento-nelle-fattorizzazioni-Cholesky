@@ -176,9 +176,9 @@ Il procedimento viene applicato ricorsivamente a $V_1$ e $V_2$, alternando il ta
 \section{Architettura del progetto}
 % ------------------------------------------------------------
 
-\subsection*{Modulo principale: \texttt{HeatEquationSolver}}
+\subsection*{Modulo principale: \texttt{HES--HeatEquationSolver}}
 
-Il sistema viene concepito come un unico risolutore logico denominato \texttt{HeatEquationSolver}, articolato in quattro sotto-moduli specializzati. I tre moduli in C++ comunicano tra loro attraverso file di testo con formato fisso che fungono da interfaccia verificabile indipendentemente; il modulo Python costituisce il punto di ingresso per la fase numerica finale.
+Il sistema viene concepito come un unico risolutore logico denominato \texttt{HES--HeatEquationSolver}, articolato in quattro sotto-moduli specializzati. I tre moduli in C++ comunicano tra loro attraverso file di testo con formato fisso che fungono da interfaccia verificabile indipendentemente; il modulo Python costituisce il punto di ingresso per la fase numerica finale.
 
 \medskip
 \begin{center}
@@ -225,7 +225,7 @@ Il sistema viene concepito come un unico risolutore logico denominato \texttt{He
 
 \node[filebox] (F1) [right=2.0cm of T1] {coords.txt\\connectivity.txt};
 \node[filebox] (F2) [right=2.0cm of T2] {ordering.txt};
-\node[filebox] (F3) [right=2.0cm of T3] {A.txt \quad rhs.txt};
+\node[filebox] (F3) [right=2.0cm of T3] {A.txt \quad b.txt};
 
 \draw[arr] (IN.south) -- (T1.north);
 \draw[arr] (T1.south) -- (T2.north);
@@ -292,7 +292,7 @@ Ogni nodo interno ha al massimo 4 vicini (sinistra, destra, basso, alto). A ogni
 \subsubsection*{Specifiche}
 
 \begin{itemize}
-  \item \textbf{Input:} Intero $N > 0$ passato da riga di comando; se assente o non valido, viene richiesto interattivamente.
+  \item \textbf{Input:} Intero $N > 0$ passato da riga di comando; se assente o non valido, si attiva un prompt iterativo con opzione di uscita (\texttt{q}).
   \item \textbf{Output:}
     \begin{itemize}
       \item \texttt{output/coords.txt} -- una riga per nodo: \texttt{id i j x y}
@@ -300,7 +300,7 @@ Ogni nodo interno ha al massimo 4 vicini (sinistra, destra, basso, alto). A ogni
     \end{itemize}
   \item \textbf{Funzionalità richieste:}
     \begin{itemize}
-      \item Parsing e validazione di $N$ con fallback interattivo.
+      \item Parsing e validazione di $N$ con fallback interattivo a ciclo (loop).
       \item Generazione dei $N^2$ nodi con ID progressivo e coordinate spaziali (precisione \texttt{double}).
       \item Costruzione della lista di adiacenza bidirezionale e scrittura degli archi senza duplicati ($u < v$).
       \item Creazione della directory \texttt{output/} se non esiste.
@@ -318,7 +318,7 @@ Ogni nodo interno ha al massimo 4 vicini (sinistra, destra, basso, alto). A ogni
 
 \subsubsection*{Logica implementativa (pseudo-codice)}
 \begin{verbatim}
-1.  Leggi N da argv; se non valido, chiedi da stdin
+1.  Leggi N da argv; se non valido chiedi da stdin in un loop finche' N>0 o utente esce
 2.  Crea cartella output/ se non esiste
 3.  Per i = 1 .. N:
 4.    Per j = 1 .. N:
@@ -432,21 +432,21 @@ Il termine noto è $b_k = -f(x_{i(k)}, y_{j(k)})$. Se il vicino $k'$ cade sul bo
 
 \begin{itemize}
   \item \textbf{Input:} Intero $N$ e flag opzionale \texttt{--reorder} da riga di comando; \texttt{output/coords.txt}; \texttt{output/ordering.txt} (solo se \texttt{--reorder}).
-  \item \textbf{Output:} \texttt{output/A.txt} (triplette \texttt{i j val}) e \texttt{output/rhs.txt} (una riga per valore di $b$).
+  \item \textbf{Output:} \texttt{output/A.txt} (triplette \texttt{i j val}) e \texttt{output/b.txt} (una riga per valore di $b$).
   \item \textbf{Funzionalità richieste:}
     \begin{itemize}
       \item Lettura di \texttt{coords.txt} e costruzione della mappa $\phi^{-1}: (i,j) \to \text{id}$.
       \item Se \texttt{--reorder}: lettura di \texttt{ordering.txt} e costruzione di \texttt{perm} e \texttt{inv\_perm}; altrimenti vettori identità.
       \item Menu interattivo per la scelta della condizione al bordo $u_0$ (selezione avviene una sola volta, prima del ciclo di assemblaggio).
       \item Assemblaggio dello stencil con gestione delle condizioni di Dirichlet.
-      \item Scrittura di \texttt{A.txt} e \texttt{rhs.txt} con precisione floating-point a 10 cifre decimali.
+      \item Scrittura di \texttt{A.txt} e \texttt{b.txt} con precisione floating-point a 10 cifre decimali.
     \end{itemize}
-  \item \textbf{Strutture dati:} \texttt{std::vector<int> perm, inv\_perm} di dimensione $N^2$; \texttt{struct Triplet \{int row, col; double val\}}; \texttt{std::vector<Triplet>} pre-allocato con \texttt{reserve(5*N*N)}; \texttt{std::vector<double> rhs}.
+  \item \textbf{Strutture dati:} \texttt{std::vector<int> perm, inv\_perm} di dimensione $N^2$; \texttt{struct Triplet \{int row, col; double val\}}; \texttt{std::vector<Triplet>} pre-allocato con \texttt{reserve(5*N*N)}; \texttt{std::vector<double> b}.
   \item \textbf{Invarianti:}
     \begin{itemize}
       \item \texttt{perm} e \texttt{inv\_perm} sono permutazioni inverse l'una dell'altra: \texttt{inv\_perm[perm[k]] == k} per ogni $k$.
       \item La matrice $A$ è simmetrica: se la tripletta $(k, k', v)$ è presente, lo è anche $(k', k, v)$.
-      \item Il numero di righe in \texttt{rhs.txt} è esattamente $N^2$.
+      \item Il numero di righe in \texttt{b.txt} è esattamente $N^2$.
     \end{itemize}
   \item \textbf{Dipendenze:} Modulo 1 (\texttt{coords.txt}); Modulo 2 (\texttt{ordering.txt}, solo se \texttt{--reorder}).
   \item \textbf{Complessità attesa:} $\mathcal{O}(N^2)$ in tempo (al più 5 entrate per nodo) e spazio.
@@ -454,23 +454,22 @@ Il termine noto è $b_k = -f(x_{i(k)}, y_{j(k)})$. Se il vicino $k'$ cade sul bo
 
 \subsubsection*{Logica implementativa (pseudo-codice)}
 \begin{verbatim}
-1.  Leggi N e flag --reorder
+1.  Leggi parametri argv: N, --reorder (opz), e scelta u0 (0..5)
 2.  Carica coords.txt in mappa coords[id] = {i, j, x, y}
 3.  Se --reorder: carica ordering.txt, costruisci perm e inv_perm
 4.               altrimenti: perm[k] = inv_perm[k] = k
-5.  Scegli condizione al bordo u0 (menu: scelte 0..5)
-6.  Per k = 0 .. N^2 - 1:
-7.    old_id = perm[k]; leggi (i, j, x, y) da coords[old_id]
-8.    Aggiungi triplet (k, k, -4*kappa/h^2)
-9.    b[k] = -f(x, y)
-10.   Per ogni direzione d in {su, giu, sx, dx}:
-11.     (ni, nj) = vicino di (i,j) in direzione d
-12.     Se (ni,nj) fuori dominio:
-13.       b[k] -= (kappa/h^2) * u0(ni*h, nj*h)
-14.     Altrimenti:
-15.       k_vic = inv_perm[id_naturale(ni,nj)]
-16.       Aggiungi triplet (k, k_vic, +kappa/h^2)
-17. Scrivi A.txt (triplet) e rhs.txt (vettore b)
+5.  Per k = 0 .. N^2 - 1:
+6.    old_id = perm[k]; leggi (i, j, x, y) da coords[old_id]
+7.    Aggiungi triplet (k, k, -4*kappa/h^2)
+8.    b[k] = -f(x, y)
+9.    Per ogni direzione d in {su, giu, sx, dx}:
+10.     (ni, nj) = vicino di (i,j) in direzione d
+11.     Se (ni,nj) fuori dominio:
+12.       b[k] -= (kappa/h^2) * u0(ni*h, nj*h)
+13.     Altrimenti:
+14.       k_vic = inv_perm[id_naturale(ni,nj)]
+15.       Aggiungi triplet (k, k_vic, +kappa/h^2)
+16. Scrivi A.txt (triplet) e b.txt (vettore b)
 \end{verbatim}
 
 \subsubsection*{Condizioni al bordo disponibili (parte opzionale)}
@@ -490,19 +489,19 @@ Il termine noto è $b_k = -f(x_{i(k)}, y_{j(k)})$. Se il vicino $k'$ cade sul bo
 \end{tabular}
 \end{center}
 
-\noindent\textbf{Verifica.} Con $N=4$ si confronta $\Delta b_k = b_k^{(u_0)} - b_k^{(0)}$ calcolato dal programma con il valore teorico atteso per ogni nodo adiacente al bordo. I 16 nodi adiacenti al bordo devono restituire un errore $< 10^{-10}$; i 4 nodi interni devono avere $\Delta b_k = 0$.
+% ---- Modulo 4 (Task 4 e Task 5) -----------------------------
+\subsection*{Modulo 4 -- \texttt{solver.ipynb}: risoluzione (Task 4) e analisi (Task 5)}
 
-% ---- Modulo 4 -----------------------------------------------
-\subsection*{Modulo 4 -- \texttt{solver.ipynb}: risoluzione e analisi numerica}
+Il Modulo 4 è il punto terminale della pipeline. In termini di specifiche progettuali, questo modulo accorpa coerentemente sia le richieste della \textbf{Task 4} (costruzione della matrice sparsa CSC e fattorizzazione di Cholesky) sia della \textbf{Task 5} (benchmark per $N \in \{32, \dots, 1024\}$, \textit{spy plot} della struttura e grafici della soluzione). 
 
-Il Modulo 4 è il punto terminale della pipeline. Legge i file prodotti dal Modulo 3, esegue la fattorizzazione di Cholesky e risolve il sistema lineare. Include anche la fase di analisi sperimentale comparativa tra le due strategie di ordinamento.
+Si è optato per questa scelta architetturale poiché entrambe le task si collocano naturalmente nello stesso ambiente di esecuzione (Python). Piuttosto che frammentare la logica in script separati, un unico Jupyter Notebook (\texttt{solver.ipynb}) funge da orchestratore finale: legge i dati generati dal Modulo 3, esegue i calcoli numerici e restituisce contestualmente l'analisi visiva e prestazionale.
 
 \subsubsection*{Specifiche}
 
 \begin{itemize}
   \item \textbf{Input:}
     \begin{itemize}
-      \item \texttt{output/A.txt} e \texttt{output/rhs.txt} (prodotti dal Modulo 3).
+      \item \texttt{output/A.txt} e \texttt{output/b.txt} (prodotti dal Modulo 3).
       \item Parametro $N$ (o serie $N \in \{32, 64, 128, 256, 512, 1024\}$ per il benchmark).
     \end{itemize}
   \item \textbf{Output:}
@@ -529,9 +528,9 @@ Il Modulo 4 è il punto terminale della pipeline. Legge i file prodotti dal Modu
   \item \textbf{Invarianti:}
     \begin{itemize}
       \item La matrice costruita da \texttt{coo\_matrix} deve essere simmetrica e definita negativa.
-      \item Il vettore soluzione $u$ deve soddisfare $\|Au - b\|_2 / \|b\|_2 < 10^{-10}$ (residuo relativo).
+      \item Il vettore soluzione $u$ deve soddisfare $\|Au - b\|_2 / \|b\|_2 < 10^{-10}$ (residuo relativo). Questa severa soglia assicura l'assenza di cancellazioni catastrofiche prodotte dall'accumulo di errori in virgola mobile, tollerando al contempo il fisiologico malcondizionamento $\mathcal{O}(N^2)$ della matrice Laplaciana all'aumentare di $N$.
     \end{itemize}
-  \item \textbf{Dipendenze:} Modulo 3 (\texttt{A.txt}, \texttt{rhs.txt}); librerie \texttt{scipy}, \texttt{numpy}, \texttt{scikit-sparse}, \texttt{matplotlib}.
+  \item \textbf{Dipendenze:} Modulo 3 (\texttt{A.txt}, \texttt{b.txt}); librerie \texttt{scipy}, \texttt{numpy}, \texttt{scikit-sparse}, \texttt{matplotlib}.
   \item \textbf{Complessità attesa:} Fill-in $O(N^3)$ con ordinamento naturale; $O(N^2 \log N)$ con nested dissection. Tempo di fattorizzazione dominato dal fill-in.
 \end{itemize}
 
@@ -541,7 +540,7 @@ Il Modulo 4 è il punto terminale della pipeline. Legge i file prodotti dal Modu
 2.   Per ordering in {naturale, nested_dissection}:
 3.     Esegui pipeline C++ via subprocess
 4.     Leggi A.txt -> costruisci coo_matrix -> converti in csc_matrix
-5.     Leggi rhs.txt -> array numpy b
+5.     Leggi b.txt -> array numpy b
 6.     Avvia timer
 7.     factor = cholesky(-A, order="natural")
 8.     L = csc_matrix(factor[0])
@@ -551,6 +550,78 @@ Il Modulo 4 è il punto terminale della pipeline. Legge i file prodotti dal Modu
 12. Genera grafici: spy plot, heatmap, superficie 3D, log-log benchmark
 \end{verbatim}
 
+% --\section{Analisi di Complessità Asintotica ($\mathcal{O}$)}
+% ------------------------------------------------------------
+
+La sostenibilità dell'intera pipeline di calcolo si regge sull'efficienza dei tre moduli preprocessori scritti in C++. Affinché il solutore numerico Python finale possa gestire griglie estremamente dense (come $N=1024$), è imperativo che la costruzione del sistema lineare e il calcolo del riordinamento non costituiscano essi stessi un collo di bottiglia.
+
+\vspace{0.3cm}
+
+\subsection{Il collo di bottiglia dell'Ordinamento Naturale}
+L'approccio ingenuo (ordinamento naturale lessicografico) fallisce irrimediabilmente per esaurimento della memoria (OOM - Out of Memory) a dimensioni elevate. Poiché la larghezza di banda della matrice $A$ è pari a $N$, il fattore di Cholesky $L$ soffre di un fill-in (riempimento di zeri con valori non nulli) proporzionale a:
+\begin{equation}
+    \text{Fill-in (Naturale)} = \mathcal{O}(N^3)
+\end{equation}
+Per $N=1024$, il numero di incognite è $V \approx 10^6$. Il fattore $L$ naturale richiederebbe di immagazzinare $\approx 10^9$ elementi in virgola mobile a doppia precisione (circa 8 GB di pura RAM solo per la matrice, ignorando l'overhead), rendendo la fattorizzazione instabile o impossibile sui computer portatili standard. La \textit{Nested Dissection} riduce drasticamente questo fill-in a $\mathcal{O}(N^2 \log N)$, rendendo il problema computazionalmente trattabile.
+
+\vspace{0.3cm}
+
+La tabella seguente riassume la complessità asintotica in Spazio e Tempo dei nostri algoritmi C++ (con $V = N^2$ incognite totali):
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lll}
+\toprule
+\textbf{Modulo (C++)} & \textbf{Complessità Temporale} & \textbf{Complessità Spaziale} \\
+\midrule
+\texttt{task1\_grid} & $\mathcal{O}(N^2)$ & $\mathcal{O}(N^2)$ \\
+\texttt{task2\_reorder} & $\mathcal{O}(N^2 \log N)$ & $\mathcal{O}(N^2)$ \\
+\texttt{task3\_assemble} & $\mathcal{O}(N^2)$ & $\mathcal{O}(N^2)$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\newpage
+
+\subsection{Modulo 1: Generazione della Topologia in $\mathcal{O}(N^2)$}
+Il problema fisico è impostato su un dominio quadrato bidimensionale discretizzato con una griglia cartesiana. Le incognite numeriche (i gradi di libertà interni) sono esattamente $V = N^2$. 
+
+L'algoritmo di instradamento effettua una singola scansione spaziale tramite due cicli \texttt{for} annidati (iterando lungo gli assi $y$ e $x$). Ad ogni iterazione, l'elaboratore esegue un set costante di operazioni logiche con costo $\mathcal{O}(1)$:
+\begin{itemize}
+    \item Calcolo dell'identificativo unidimensionale \texttt{id}.
+    \item Assegnazione delle coordinate reali $x$ e $y$.
+    \item Mappatura dei vicini (creazione degli archi).
+\end{itemize}
+Poiché vengono eseguiti passaggi in tempo costante per ciascuno degli $N^2$ nodi, il tempo globale scala linearmente con il numero totale di incognite, $\mathcal{O}(N^2)$.
+Lo spazio in memoria RAM è dominato dall'allocazione delle strutture dati primarie (come \texttt{std::vector<Node>}), dimensionate esattamente a $N^2$ istanze. Ciò garantisce una limitazione spaziale rigorosa e stabile a $\mathcal{O}(N^2)$.
+
+\vspace{0.5cm}
+
+\subsection{Modulo 2: Nested Dissection Geometrica in $\mathcal{O}(N^2 \log N)$}
+Il modulo di riordinamento sfrutta nativamente la disposizione geometrica della griglia anziché esplorare topologicamente il grafo (ad esempio tramite costose ricerche BFS). Per fare questo adotta un elegante paradigma ricorsivo \textit{Divide et Impera}. 
+
+Ad ogni step della ricorsione virtuale, l'insieme dei nodi attivi di cardinalità $K$ viene ispezionato linearmente con una complessità pari a $\mathcal{O}(K)$ per individuare il separatore assiale corretto e frammentare di conseguenza la regione in due sotto-domini disgiunti di dimensione $\approx K/2$.
+L'albero decisionale possiede una profondità limitata logaritmicamente rispetto ai gradi di libertà totali, ossia $\log_2(V)$. Il quantitativo di operazioni per ogni singolo livello dell'albero si bilancia proporzionalmente al numero totale dei nodi $V$.
+Questa dinamica si esprime formalmente tramite la ricorrenza universale del \textit{Master Theorem}:
+\begin{equation}
+    T(V) = 2T\left(\frac{V}{2}\right) + \mathcal{O}(V)
+\end{equation}
+La cui soluzione asintotica in forma chiusa è calcolabile come:
+\begin{equation}
+    T(V) = \mathcal{O}(V \log V) \implies \mathcal{O}(N^2 \log(N^2)) \implies \mathcal{O}(N^2 \log N)
+\end{equation}
+
+Dal punto di vista dell'ottimizzazione in memoria spaziale, è stata inibita preventivamente qualsiasi duplicazione o clonazione spuria dei dati. Le iterazioni sono gestite operando manipolazioni in loco (\textit{in-place}) sui vettori indice pre-allocati. Lo stack esplicito di tipo LIFO (implementato ad hoc per non congestionare il call-stack di sistema con funzioni ricorsive classiche) raggiunge una profondità massima irrisoria quantificabile in $\mathcal{O}(\log N)$. Di conseguenza, l'impronta finale dell'eseguibile sulla memoria resta inesorabilmente e fortemente ancorata al tetto di $\mathcal{O}(N^2)$.
+
+\vspace{0.5cm}
+
+\subsection{Modulo 3: Assemblaggio del Sistema in $\mathcal{O}(N^2)$}
+La discretizzazione differenziale si basa su uno stencil discreto di Laplace a 5 punti. Il cuore matematico è attraversato serialmente sulle $N^2$ righe ideali che comporranno la matrice finale di Poisson.
+
+Per la struttura fisica strettamente spaziale intrinseca all'operatore di Laplace bidimensionale $\nabla^2$, ciascuna molecola discreta si accoppia e interagisce analiticamente solo coi suoi diretti vicini (Nord, Sud, Est, Ovest). Il calcolatore impiega calcoli in esecuzione rapida $\mathcal{O}(1)$ per derivare i divisori spaziali $\kappa / h^2$ e incorporare con il segno opposto i contributi asimmetrici delle condizioni di Dirichlet al bordo $u_0(x,y)$.
+
+Questa metodologia partorisce una matrice \textit{sparsa} che assicura a livello algebrico la genesi di non più di $5$ elementi non nulli per ciascuna riga del dominio. I moduli precludono alla radice l'inizializzazione di pesanti matrici dense temporanee (evitando allocazioni inutili di zeri); ragion per cui il tempo di saturazione dell'assemblaggio evolve in proporzione esatta a $V$, ovverosia $\mathcal{O}(N^2)$.
+Infine, per abbattere criticamente i costi accessori dettati dalle riallocazioni dinamiche in volo, il vettore di triplette (formato COO) proprio della \textit{Standard Library} del C++ pre-riserva la dimensione necessaria impiegando la macro-chiamata \texttt{reserve(5*N*N)}. Questa istruzione chirurgica inchioda l'impronta di RAM a una mole rigidamente stimata in $\mathcal{O}(N^2)$.
 % ------------------------------------------------------------
 \newpage
 \section{Piano di validazione sperimentale}
@@ -572,17 +643,39 @@ Larghezza di banda di $A$  & $\Theta(N)$       & $O(\sqrt{N^2}) = O(N)$ \\
 \end{tabular}
 \end{center}
 
-\subsection*{Test di correttezza}
+\subsection*{1. Sanity Checks Fisici e Numerici (Verifica della Soluzione)}
+
+Il modo più efficace per validare il codice del \textbf{Modulo 3} e \textbf{Modulo 4} consiste nel testare il sistema con scenari di cui si conosce già la soluzione analitica. Al fine di evitare interruzioni manuali della pipeline ed estendere fluidamente la batteria di test in Python, \textbf{le condizioni al bordo $u_0(x,y)$ sono state parametrizzate a riga di comando} (tramite \texttt{argv} nel backend C++). Questo accorgimento espone sul notebook una direttiva \texttt{bordo} flessibile, cruciale per validare istantaneamente i seguenti casi fisici in modo automatizzato:
 
 \begin{itemize}
-  \item \textbf{Residuo relativo:} Per ogni $N$ testato, verificare $\|Au - b\|_2 / \|b\|_2 < 10^{-10}$.
-  \item \textbf{Soluzione esatta con $u_0 = x^2 - y^2$:} Poiché $\nabla^2(x^2-y^2) = 0$, con $f = 0$ la soluzione numerica deve coincidere con $u_0$ fino agli errori di arrotondamento.
-  \item \textbf{Verifica della permutazione:} Il vettore \texttt{ordering} deve essere una permutazione valida di $\{0,\ldots,N^2-1\}$.
+  \item \textbf{Il "Caso Zero" (Opzione 0):} Impostando la sorgente interna $f = 0$ e la temperatura al bordo $u_0 = 0$, la soluzione numerica calcolata \textbf{deve risultare identica a zero} in ogni punto del dominio. La mancata aderenza indicherebbe un leak nel vettore del termine noto $b$.
+  \item \textbf{Caso Temperatura Costante (Opzione 1):} Fissando uniformemente l'involucro a una costante termica $C$ (es. $u_0 = 10$), il calore permea la piastra sino a renderla totalmente isoterma. La soluzione calcolata internamente deve convergere univocamente al limite $C$.
+  \item \textbf{Caso Funzione Armonica (Opzione 4):} Attivando la condizione armonica quadratica $u_0 = x^2 - y^2$ in perfetta assenza di flussi sorgente integrativi, la soluzione numerica è costretta a ricalcare la medesima forma quadratica originaria in virtù del teorema della divergenza (\(\nabla^2(x^2 - y^2) = 0\)). Sfruttando tale automatismo nei parametri a riga di comando, il modulo di benchmark conferma la bontà algebrica testando e rilevando uno scarto residuo irrilevante confinato nell'ordine dei $\approx 10^{-16}$, garantendo inequivocabilmente l'assenza di singolarità anomale nello stencil a 5 punti.
 \end{itemize}
 
-\subsection*{Test di scalabilità}
+\subsection*{2. Validazione della Logica e dell'Integrità (Moduli 1 e 2)}
 
-Il benchmark viene eseguito per $N \in \{32, 64, 128, 256, 512, 1024\}$. I risultati ottenuti sono visualizzati in scala log-log:
+Prima di sfociare nella risoluzione algebrica intensiva, occorre sincerarsi che i layer C++ compilino set di dati architetturalmente incrollabili:
+
+\begin{itemize}
+  \item \textbf{Integrità della Permutazione in Python:} Ritenendo categoricamente inaccettabile l'ipotesi per la quale il mapping partorito dal \textbf{Modulo 2} possa obliterare o raddoppiare accidentalmente dei gradi di libertà interni, il fascicolo d'ordinamento della \textit{Nested Dissection} soggiace al setaccio attivo perpetrato da una serrata \textit{asserzione diagnostica} direttamente inglobata nella griglia operativa del Notebook Jupyter:
+  \begin{verbatim}
+  assert len(np.unique(ordering)) == len(ordering) == N*N
+  \end{verbatim}
+  Sfruttando le routine scalari ottimizzate proprie del modulo NumPy, preposte al riordinamento analitico (richiedenti un dazio computazionale misurato in $\mathcal{O}(V \log V)$, ridicolmente più parsimonioso a fronte della decomposizione monolitica densa Cholesky scalante come $\mathcal{O}(V^{1.5})$), la sub-routine referta immantinente e assevera che la topologia \texttt{ordering.txt} tracci una biiezione netta e inflessibile iscritta all'interno della cornice limitante $[0, N^2-1]$.
+  \item \textbf{Robustezza Incondizionata dell'Input:} Il Modulo 1 ha innestato una sentinella ciclica in fase iterativa \textit{fail-safe}: l'accidentale iniezione in fase diagnostica di un tetto di partizionamento negativo, o paritetico allo zero assoluto ($N \le 0$), induce la piattaforma a un \textit{fallback interattivo} reiterato al fine di proteggere il task da crac prematuri, corruzioni involontarie a discapito della geometria di calcolo, o rotture del processo (famigerati segment-fault).
+  \item \textbf{Precisione Matematica Flottante in transito:} Onde sventare emorragie qualitative scaturite dall'arrotondamento letale durante la staffetta di pacchetti tra il layer interiore C++ e l'interfaccia apicale di risoluzione Python, l'imbocco canalizzato di file-system \texttt{std::ofstream} viene perimetrato costantemente e inviolabilmente vincolato a una risoluzione nominale forzata pari a \texttt{setprecision(10)}.
+\end{itemize}
+
+\subsection*{3. Validazione Algoritmica e Performance (Modulo 4)}
+
+L'analisi sperimentale funge essa stessa da validazione empirica per le complessità teoriche attese:
+
+\begin{itemize}
+  \item \textbf{Spy Plot:} Visualizzare la matrice $L$ con \texttt{plt.spy()} è un sanity check visivo fondamentale: se la \textit{Nested Dissection} è implementata correttamente, si vedranno molti più "spazi vuoti" (minore fill-in) rispetto al denso blocco dell'ordinamento naturale.
+  \item \textbf{Grafico Log-Log:} Verificando la pendenza dei tempi di esecuzione e del fill-in (\texttt{nnz}), se la pendenza per l'ordinamento naturale è circa 3 (corrispondente a $\mathcal{O}(N^3)$) e quella della \textit{Nested Dissection} è sensibilmente inferiore (vicina a 2), l'implementazione è confermata.
+  \item \textbf{Controllo SPD:} La matrice $-A$ assemblata deve essere rigorosamente \textbf{Simmetrica Definita Positiva}. Un test immediato è verificare che la fattorizzazione di Cholesky in Python non restituisca eccezioni (che si verificherebbero se la matrice avesse autovalori nulli o positivi a causa di bug nello stencil).
+\end{itemize}
 
 \begin{figure}[H]
   \centering
@@ -591,16 +684,14 @@ Il benchmark viene eseguito per $N \in \{32, 64, 128, 256, 512, 1024\}$. I risul
   \label{fig:benchmark}
 \end{figure}
 
-Come visibile in Figura~\ref{fig:benchmark}, il numero di entrate non nulle nel fattore $L$ mostra due andamenti divergenti: l'ordinamento naturale segue la pendenza $O(N^3)$, mentre la nested dissection segue la pendenza più piatta $O(N^2 \log N)$, con un risparmio che diventa dominante per $N \ge 128$.
+\textbf{Nota sui limiti hardware ($N=1024$):} Per il caso estremo $N=1024$ (con un numero di incognite pari a $V = N^2 \approx 10^6$), l'algoritmo con ordinamento Naturale satura rapidamente la memoria RAM disponibile, sfociando in un blocco del sistema operativo per Out-Of-Memory. Questo accade perché la larghezza di banda del sistema è pari a $N$, producendo nel fattore di Cholesky $L$ un fill-in teorico di circa $V \times N = N^3 \approx 10^9$ elementi non nulli. Essendo numeri in doppia precisione da $8$ byte ciascuno, il fattore richiede $10^9 \times 8 \text{ byte} \approx 8 \text{ GB}$ di pura RAM (di cui oltre 6.5 GB di memoria fisica effettivamente allocati e saturati durante il calcolo). Pertanto, la curva dell'ordinamento Naturale si interrompe in Figura~\ref{fig:benchmark} a $N=512$.
 
-\textbf{Nota sui limiti hardware ($N=1024$):} Per il caso estremo $N=1024$ (circa un milione di incognite), l'algoritmo con ordinamento Naturale satura rapidamente la memoria RAM disponibile (richiedendo oltre 6.5 GB fisici per allocare il fattore $L$), sfociando di fatto in un blocco del sistema operativo per Out-Of-Memory. Pertanto, la curva dell'ordinamento Naturale si interrompe in Figura~\ref{fig:benchmark} a $N=512$. Questo ostacolo fisico tangibile evidenzia in modo inequivocabile la necessità ingegneristica di ricorrere ad algoritmi ottimali come la \textit{Nested Dissection}, che completa in meno di 10 secondi lo stesso problema da un milione di equazioni allocando una frazione trascurabile di RAM.
+\subsection*{4. Gestione degli Errori di Input}
 
-\subsection*{Visualizzazioni}
-
-\begin{enumerate}
-  \item \textbf{Spy plot:} Struttura di sparsità della matrice $A$ e del fattore $L$ per $N=32$, per entrambi gli ordinamenti. Si deve osservare un blocco quasi-pieno per l'ordinamento naturale e una struttura a blocchi sparsi per la nested dissection.
-  \item \textbf{Mappa di calore e superficie 3D:} La soluzione $u(x,y)$ deve mostrare un picco di temperatura in prossimità dell'angolo $(0,0)$, dove la sorgente gaussiana è concentrata, con decadimento verso i bordi freddi.
-\end{enumerate}
+Il sistema garantisce solidità intercettando le deviazioni dell'utente:
+\begin{itemize}
+  \item \textbf{Validazione di N:} Il programma deve gestire l'assenza di argomenti da riga di comando o valori non validi (es. $N < 1$, caratteri alfabetici) senza collassare. In questi scenari, non stampa solo un messaggio di errore su \texttt{cerr} terminando (fallback grezzo), bensì innesca un fallback interattivo robusto. Tramite un ciclo \texttt{while}, richiede continuamente l'inserimento di un parametro sano finché non viene fornito un $N > 0$ oppure finché l'utente digita \texttt{q} per uscire in totale sicurezza con \texttt{return 1}.
+\end{itemize}
 
 % ============================================================
 \end{document}
