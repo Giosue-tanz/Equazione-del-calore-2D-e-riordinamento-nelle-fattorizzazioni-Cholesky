@@ -19,13 +19,12 @@
 //    3. Implementazione O(N²logN) deterministica e ottimale per griglie
 //    4. Separatore garantito bilanciato (N/2 nodi per lato)
 //
-//  Algoritmo (iterativo con stack esplicito):
+//  Algoritmo (ricorsivo classico):
 //    • Inizia con tutti i nodi, asse di taglio = X (i)
 //    • Calcola mid = (min_val + max_val) / 2 sull'asse corrente
 //    • Partiziona: V1 (coord < mid), V2 (coord > mid), VS (coord = mid)
-//    • Push su stack: VS (separatore), V2, V1  [ordine LIFO]
-//    • Ordine finale: V1 → V2 → VS (separatore in fondo)
-//    • Alterna asse X/Y ad ogni livello
+//    • Richiama ricorsivamente la funzione su V1 e V2 (alternando asse X/Y)
+//    • Ordine finale: V1, poi V2, infine VS (separatore aggiunto per ultimo)
 //
 //  Input:  output/coords.txt   (prodotto da task1_grid)
 //  Output: output/ordering.txt (una riga: "new_id old_id")
@@ -38,8 +37,6 @@
 #include <vector>
 #include <algorithm>
 #include <string>
-#include <stack>    // stack esplicito in heap (evita stack overflow su griglie grandi)
-
 using namespace std;
 
 // Cartella di output condivisa con gli altri task
@@ -60,88 +57,59 @@ struct Node {
 };
 
 // ============================================================
-//  Item sullo stack esplicito per la nested dissection iterativa.
-//  Separare il flag 'separatore' consente di ritardare la scrittura
-//  del separatore VS fino a che V1 e V2 non sono completati.
-// ============================================================
-struct StackItem {
-    vector<Node> S;       // sottoinsieme di nodi da processare
-    int axis;             // asse di taglio: 0 = X (colonne di i), 1 = Y (colonne di j)
-    bool is_separator;    // true: questo item va aggiunto direttamente all'ordinamento
-};
-
-// ============================================================
 //  nested_dissection_geometrica
 //  ────────────────────────────
-//  Versione ITERATIVA con stack esplicito allocato sull'heap.
-//  La versione ricorsiva sarebbe più leggibile ma causerebbe
-//  stack overflow per N >> 1000 (profondità O(log N) con sotto-
-//  problemi di dimensione O(N²) porta a frame molto grandi).
-//
-//  Complessità: O(N² log N) in tempo, O(N²) in spazio.
+//  Versione RICORSIVA classica.
+//  Applica Divide et Impera partizionando geometricamente i nodi.
+//  Complessità: O(N² log N) in tempo, profondità albero O(log N).
 // ============================================================
 void nested_dissection_geometrica(const vector<Node>& nodi_iniziali,
                                    int axis_iniziale,
                                    vector<int>& ordering)
 {
-    stack<StackItem> stk;
-    stk.push({nodi_iniziali, axis_iniziale, false});
+    // ── Caso base: nessun nodo ──────────────────────────────────────────
+    if (nodi_iniziali.empty()) return;
 
-    while (!stk.empty()) {
-        StackItem item = move(stk.top());
-        stk.pop();
+    // ── Caso base: nodo singolo ─────────────────────────────────────────
+    if (nodi_iniziali.size() == 1) {
+        ordering.push_back(nodi_iniziali[0].id);
+        return;
+    }
 
-        // ── Caso 1: separatore già calcolato → aggiungilo all'ordinamento ──
-        if (item.is_separator) {
-            for (const auto& node : item.S)
-                ordering.push_back(node.id);
-            continue;
-        }
+    // ── Calcolo separatore geometrico ───────────────────────────────────
+    int min_val = (axis_iniziale == 0) ? nodi_iniziali[0].i : nodi_iniziali[0].j;
+    int max_val = min_val;
+    for (const auto& node : nodi_iniziali) {
+        int val = (axis_iniziale == 0) ? node.i : node.j;
+        if (val < min_val) min_val = val;
+        if (val > max_val) max_val = val;
+    }
 
-        // ── Caso base: nessun nodo ──────────────────────────────────────────
-        if (item.S.empty()) continue;
+    int mid_val = (min_val + max_val) / 2;
 
-        // ── Caso base: nodo singolo ─────────────────────────────────────────
-        if (item.S.size() == 1) {
-            ordering.push_back(item.S[0].id);
-            continue;
-        }
+    vector<Node> V1, V2, VS;
+    V1.reserve(nodi_iniziali.size());
+    V2.reserve(nodi_iniziali.size());
+    VS.reserve(nodi_iniziali.size());
 
-        // ── Calcolo separatore geometrico ───────────────────────────────────
-        // Usiamo gli indici interi (i o j) per robustezza numerica.
-        // Il taglio mediano garantisce bilanciamento esatto per griglie regolari.
-        int min_val = (item.axis == 0) ? item.S[0].i : item.S[0].j;
-        int max_val = min_val;
-        for (const auto& node : item.S) {
-            int val = (item.axis == 0) ? node.i : node.j;
-            if (val < min_val) min_val = val;
-            if (val > max_val) max_val = val;
-        }
+    for (const auto& node : nodi_iniziali) {
+        int val = (axis_iniziale == 0) ? node.i : node.j;
+        if      (val < mid_val) V1.push_back(node);
+        else if (val > mid_val) V2.push_back(node);
+        else                    VS.push_back(node);
+    }
 
-        // Mediana intera: separa [min_val, mid-1] da [mid+1, max_val]
-        // VS = { nodi con coordinata == mid }  → separatore geometrico
-        int mid_val = (min_val + max_val) / 2;
-
-        vector<Node> V1, V2, VS;
-        V1.reserve(item.S.size());
-        V2.reserve(item.S.size());
-        VS.reserve(item.S.size());
-
-        for (const auto& node : item.S) {
-            int val = (item.axis == 0) ? node.i : node.j;
-            if      (val < mid_val) V1.push_back(node);
-            else if (val > mid_val) V2.push_back(node);
-            else                    VS.push_back(node);
-        }
-
-        // ── Push in ordine LIFO ─────────────────────────────────────────────
-        // Ordine desiderato:   V1 → V2 → VS
-        // Quindi push inverso: VS (fondo), V2, V1 (cima)
-        // L'asse si alterna ad ogni livello di ricorsione.
-        int next_axis = 1 - item.axis;
-        stk.push({VS, item.axis, true});   // separatore: flag = true
-        stk.push({V2, next_axis, false});
-        stk.push({V1, next_axis, false});
+    // ── Chiamate ricorsive ──────────────────────────────────────────────
+    // L'asse si alterna ad ogni livello di ricorsione.
+    int next_axis = 1 - axis_iniziale;
+    
+    nested_dissection_geometrica(V1, next_axis, ordering);
+    nested_dissection_geometrica(V2, next_axis, ordering);
+    
+    // ── Aggiunta separatore ─────────────────────────────────────────────
+    // Il separatore VS viene aggiunto alla fine per essere posizionato in fondo
+    for (const auto& node : VS) {
+        ordering.push_back(node.id);
     }
 }
 

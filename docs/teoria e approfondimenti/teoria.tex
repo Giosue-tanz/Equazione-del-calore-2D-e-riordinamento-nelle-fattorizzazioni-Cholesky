@@ -1217,88 +1217,56 @@ Si sarebbe potuto usare \texttt{std::pair<int,int>} o anche \texttt{std::tuple},
 
 \subsection{La struttura \texttt{StackItem} e il flag \texttt{is\_separator}}
 
-\begin{lstlisting}[style=cpp, caption={StackItem: l'astrazione chiave dell'algoritmo iterativo}]
-struct StackItem {
-    vector<Node> S;    // il sottoinsieme di nodi da elaborare
-    int axis;          // asse di taglio: 0 = X (usa i), 1 = Y (usa j)
-    bool is_separator; // true = aggiungere all'ordinamento senza partizionare
-};
-\end{lstlisting}
+\subsection{L'algoritmo Divide et Impera: Ricorsione Classica}
 
-Il campo \texttt{is\_separator} è la chiave dell'algoritmo iterativo. Nella versione ricorsiva, il separatore $V_S$ viene aggiunto all'ordinamento \emph{dopo} che la ricorsione su $V_1$ e $V_2$ è completata. Nella versione iterativa non esiste questo concetto di ``dopo la ricorsione''. La soluzione è inserire $V_S$ nello stack con il flag \texttt{is\_separator=true}: quando verrà estratto, il ciclo \texttt{while} lo riconoscerà e lo copierà direttamente nell'ordinamento finale, senza partizionarlo ulteriormente.
+L'algoritmo di nested dissection è intrinsecamente ricorsivo. Nel nostro Modulo 2, l'approccio segue fedelmente il paradigma \textit{Divide et Impera} tramite chiamate a funzione standard in C++:
 
-\subsection{Versione iterativa con \texttt{std::stack}: perché non la ricorsione?}
-
-L'algoritmo di nested dissection è intrinsecamente ricorsivo. La versione naïve in C++ sarebbe:
-\begin{lstlisting}[style=cpp, caption={Versione RICORSIVA — pericolosa per N grandi}]
-void nd_ricorsiva(vector<Node> S, int axis, vector<int>& ord) {
-    // ... partiziona in V1, VS, V2 ...
-    nd_ricorsiva(V1, 1-axis, ord); // frame con vettore di N^2/2 nodi
-    nd_ricorsiva(V2, 1-axis, ord); // idem
-    for (auto& n : VS) ord.push_back(n.id);
-}
-\end{lstlisting}
-
-Il problema: ogni chiamata ricorsiva alloca un frame sullo \emph{stack di sistema}, che è tipicamente limitato a 1--8 MB. Per una griglia $N=1024$, la profondità della ricorsione è $\log_2(1024^2) = 20$ livelli. Ogni frame contiene un \texttt{vector<Node>} con fino a $1024^2/2 \approx 500.000$ nodi (circa 20 MB). La memoria richiesta è enorme e lo stack di sistema va in overflow (\emph{Stack Overflow}, non il sito web).
-
-\textbf{La soluzione: \texttt{std::stack} allocato sull'heap.} La libreria standard di C++ \texttt{<stack>} implementa una struttura LIFO (Last In, First Out) i cui elementi vengono allocati sull'\emph{heap}, la memoria dinamica di processo che in Linux è praticamente illimitata (limitata dalla RAM e dallo swap). L'algoritmo diventa così:
-
-\begin{lstlisting}[style=cpp, caption={Versione ITERATIVA con stack esplicito — sicura}]
+\begin{lstlisting}[style=cpp, caption={Struttura della ricorsione}]
 void nested_dissection_geometrica(const vector<Node>& nodi_iniziali,
                                    int axis_iniziale,
                                    vector<int>& ordering)
 {
-    stack<StackItem> stk;                          // stack sull'heap
-    stk.push({nodi_iniziali, axis_iniziale, false});
+    // 1. Casi base
+    if (nodi_iniziali.empty()) return;
+    if (nodi_iniziali.size() == 1) {
+        ordering.push_back(nodi_iniziali[0].id);
+        return;
+    }
 
-    while (!stk.empty()) {
-        StackItem item = move(stk.top()); // (1) move: trasferimento senza copia
-        stk.pop();
+    // 2. Partizionamento geometrico ...
+    
+    // 3. Chiamate ricorsive
+    int next_axis = 1 - axis_iniziale;
+    nested_dissection_geometrica(V1, next_axis, ordering);
+    nested_dissection_geometrica(V2, next_axis, ordering);
 
-        if (item.is_separator) {          // (2) separatore: copia e basta
-            for (const auto& n : item.S)
-                ordering.push_back(n.id);
-            continue;
-        }
-        if (item.S.empty()) continue;     // (3) caso base vuoto
-        if (item.S.size() == 1) {         // (4) caso base singolo
-            ordering.push_back(item.S[0].id);
-            continue;
-        }
-        // ... partizionamento e push ...
+    // 4. Inserimento del separatore
+    for (const auto& n : VS) {
+        ordering.push_back(n.id);
     }
 }
 \end{lstlisting}
-
-\textbf{(1) Perché \texttt{move(stk.top())}?} L'operazione \texttt{stk.top()} restituisce un riferimento all'elemento in cima allo stack. Senza \texttt{move}, scrivere \texttt{StackItem item = stk.top()} eseguirebbe una \emph{copia profonda} del vettore \texttt{S}, che per $N=512$ può contenere decine di migliaia di elementi. \texttt{std::move} converte il valore in un \emph{rvalue reference}, trasferendo la proprietà della memoria interna del vettore senza copiare i dati: l'operazione è $\mathcal{O}(1)$ invece di $\mathcal{O}(\text{size})$.
-
-\textbf{(2--4) Perché tre casi base?} Rispecchiano i casi della ricorsione:
-\begin{itemize}
-  \item \texttt{is\_separator}: il separatore è già stato calcolato in un'iterazione precedente.
-  \item \texttt{S.empty()}: possibile se il partizionamento produce un sottoinsieme vuoto (es. griglia con $N$ pari e tutti i nodi su un lato della mediana).
-  \item \texttt{S.size()==1}: un singolo nodo non ha da partizionare.
-\end{itemize}
 
 \subsection{Il partizionamento geometrico: mediana intera e \texttt{reserve} pessimistico}
 
 \begin{lstlisting}[style=cpp, caption={Calcolo della mediana e suddivisione in V1, VS, V2}]
 // Range dell'asse di taglio
-int min_val = (item.axis == 0) ? item.S[0].i : item.S[0].j;
+int min_val = (axis_iniziale == 0) ? nodi_iniziali[0].i : nodi_iniziali[0].j;
 int max_val = min_val;
-for (const auto& node : item.S) {
-    int val = (item.axis == 0) ? node.i : node.j;
+for (const auto& node : nodi_iniziali) {
+    int val = (axis_iniziale == 0) ? node.i : node.j;
     if (val < min_val) min_val = val;
     if (val > max_val) max_val = val;
 }
 int mid_val = (min_val + max_val) / 2; // divisione intera: mediana geometrica
 
 vector<Node> V1, V2, VS;
-V1.reserve(item.S.size()); // (!) pessimistico, ma evita riallocazioni
-V2.reserve(item.S.size());
-VS.reserve(item.S.size());
+V1.reserve(nodi_iniziali.size()); // (!) pessimistico, ma evita riallocazioni
+V2.reserve(nodi_iniziali.size());
+VS.reserve(nodi_iniziali.size());
 
-for (const auto& node : item.S) {
-    int val = (item.axis == 0) ? node.i : node.j;
+for (const auto& node : nodi_iniziali) {
+    int val = (axis_iniziale == 0) ? node.i : node.j;
     if      (val < mid_val) V1.push_back(node);
     else if (val > mid_val) V2.push_back(node);
     else                    VS.push_back(node); // separatore geometrico
@@ -1307,25 +1275,23 @@ for (const auto& node : item.S) {
 
 \textbf{Perché la mediana intera \texttt{(min\_val + max\_val) / 2}?} La divisione intera di due \texttt{int} in C++ esegue il troncamento verso zero (floor). Per indici sempre positivi, questa è esattamente la mediana del range. La scelta degli \emph{indici interi} $(i,j)$ al posto delle coordinate floating point $(x,y)$ garantisce confronti esatti, senza errori di arrotondamento che potrebbero classificare erroneamente nodi al confine.
 
-\textbf{Perché \texttt{.reserve(item.S.size())} su tutti e tre i vettori?} È una stima \emph{pessimistica}: nel caso peggiore, tutti i nodi potrebbero finire in un singolo vettore. Riservare la dimensione massima possibile evita qualsiasi riallocazione durante i \texttt{push\_back}, al costo di sprecare temporaneamente della memoria. Dato che i tre vettori sono locali alla singola iterazione e vengono deallocati appena estratti dallo stack, il consumo di memoria è sempre sotto controllo.
+\textbf{Perché \texttt{.reserve(nodi\_iniziali.size())} su tutti e tre i vettori?} È una stima \emph{pessimistica}: nel caso peggiore, tutti i nodi potrebbero finire in un singolo vettore. Riservare la dimensione massima possibile evita qualsiasi riallocazione durante i \texttt{push\_back}, al costo di sprecare temporaneamente della memoria. Dato che i vettori sono locali al frame di funzione corrente, il consumo di memoria rimane comunque controllato.
 
-\subsection{L'alternanza degli assi e la logica LIFO dello stack}
+\subsection{L'alternanza degli assi e l'ordine delle chiamate ricorsive}
 
-\begin{lstlisting}[style=cpp, caption={Inserimento in ordine inverso: LIFO garantisce FIFO nell'elaborazione}]
-int next_axis = 1 - item.axis; // alterna: 0->1, 1->0
-// Vogliamo elaborare: V1 prima, V2 dopo, VS per ultimo.
-// Lo stack e' LIFO: l'ultimo inserito e' il primo estratto.
-// Quindi inseriamo in ordine INVERSO: VS, V2, V1.
-stk.push({move(VS), item.axis,  true});  // VS inserito per primo = estratto per ultimo
-stk.push({move(V2), next_axis,  false}); // V2 inserito secondo   = estratto per secondo
-stk.push({move(V1), next_axis,  false}); // V1 inserito per ultimo = estratto per primo
+\begin{lstlisting}[style=cpp, caption={Alternanza asse e ricorsione}]
+int next_axis = 1 - axis_iniziale; // alterna: 0->1, 1->0
+nested_dissection_geometrica(V1, next_axis, ordering);
+nested_dissection_geometrica(V2, next_axis, ordering);
+
+for (const auto& n : VS) {
+    ordering.push_back(n.id);
+}
 \end{lstlisting}
 
-\textbf{Perché \texttt{1 - item.axis}?} È un trucco elegante per alternare un flag binario: se \texttt{axis = 0} (asse X), l'espressione vale 1 (asse Y); se \texttt{axis = 1}, vale 0. L'alternanza garantisce che i tagli si alternino tra orizzontale e verticale ad ogni livello della gerarchia, producendo blocchi sempre bilanciati in entrambe le dimensioni.
+\textbf{Perché \texttt{1 - axis\_iniziale}?} È un trucco elegante per alternare un flag binario: se \texttt{axis = 0} (asse X), l'espressione vale 1 (asse Y); se \texttt{axis = 1}, vale 0. L'alternanza garantisce che i tagli si alternino tra orizzontale e verticale ad ogni livello della gerarchia, producendo blocchi sempre bilanciati in entrambe le dimensioni.
 
-\textbf{La logica LIFO in dettaglio:} Lo stack è Last In, First Out. Affinché l'elaborazione avvenga nell'ordine \texttt{V1 → V2 → VS}, bisogna inserire nell'ordine inverso \texttt{VS → V2 → V1}. \texttt{V1} in cima allo stack viene estratto per primo; \texttt{VS} in fondo viene estratto solo quando sia \texttt{V1} che \texttt{V2} (e tutte le loro sotto-partizioni ricorsive) sono stati completamente elaborati. Questo è precisamente il comportamento che avremmo con la ricorsione.
-
-\textbf{Nota:} si usa \texttt{move(VS)} anche qui per evitare la copia del vettore durante il \texttt{push} nello stack.
+\textbf{Gestione della memoria:} Come richiesto dalle specifiche progettuali, per i nostri $N$ di test (es. $N=1024$), la profondità dell'albero di chiamata è contenuta. Questo consente all'algoritmo ricorsivo di funzionare in modo nativo e performante.
 
 \subsection{Gestione degli Errori (Fail) e Output Generato}
 
@@ -1522,16 +1488,18 @@ double get_u0(double x, double y, int scelta) {
         case 1: return 10.0;                         // costante
         case 2: return x;                            // gradiente lineare
         case 3: return sin(M_PI * x);                // sinusoidale
-        case 4: return x * x - y * y;               // armonica
-        case 5: return (y >= 1.0 - 1e-9) ? 1.0 : 0.0; // shock termico
-        default: return 0.0;
+        case 4: return x * x - y * y;                // armonica
+        case 5: return (y >= 1.0 - 1e-10) ? 1.0 : 0.0; // shock termico
+        default:
+            cerr << "Errore: scelta bordo non valida (" << scelta << ")." << endl;
+            exit(1);
     }
 }
 \end{lstlisting}
 
 \textbf{Perché \texttt{switch} invece di una catena \texttt{if-else}?} Per interi, il compilatore implementa \texttt{switch} tramite una \emph{jump table}: un array di puntatori a codice, indicizzato direttamente dal valore di \texttt{scelta}. L'esecuzione è $\mathcal{O}(1)$ indipendentemente dal numero di casi. Una catena \texttt{if-else} invece viene valutata sequenzialmente: nel caso peggiore (\texttt{case 5}) richiederebbe 5 confronti.
 
-\textbf{Perché \texttt{1e-9} nel caso 5?} Il confronto \texttt{y >= 1.0} su un \texttt{double} è pericoloso: il valore \texttt{y = j/(N+1)} per $j = N+1$ dovrebbe essere esattamente 1, ma rappresentato in virgola mobile potrebbe essere 0.999999... o 1.000000001 a causa degli errori di arrotondamento. La tolleranza \texttt{1e-9} rende il confronto robusto.
+\textbf{Perché \texttt{1e-10} nel caso 5?} Il confronto \texttt{y >= 1.0} su un \texttt{double} è pericoloso: il valore \texttt{y = j/(N+1)} per $j = N+1$ dovrebbe essere esattamente 1, ma rappresentato in virgola mobile potrebbe essere 0.999999... o 1.000000001 a causa degli errori di arrotondamento. La tolleranza \texttt{1e-10} rende il confronto robusto.
 
 \textbf{Scopo fisico e \textit{Sanity Checks} sperimentali:}
 Le diverse condizioni al bordo implementate non sono solo varianti fisiche, ma costituiscono la base per i \textbf{Sanity Checks sperimentali}, eseguiti in Python per validare in automatico la correttezza della discretizzazione (se $f=0$):
@@ -1767,19 +1735,20 @@ Il progetto adotta un'architettura modulare suddivisa in quattro fasi logiche di
 \textbf{Approccio scelto:} Nel progetto è stato consapevolmente adottato l'approccio \textbf{geometrico}. Per un dominio 2D regolare, usare complessi algoritmi di visita su grafo (esplorando liste di adiacenza) è inefficiente e superfluo. Grazie all'approccio geometrico, il \texttt{task2} non ha nemmeno bisogno di leggere il grafo (\texttt{connectivity.txt}), ma si basa esclusivamente sulle coordinate spaziali, tagliando di netto il dominio a metà calcolando banali mediane intere lungo gli assi.
 \\
 \textbf{Come è scritto l'algoritmo:}
-Al posto della naturale ricorsione (che per griglie grandi come $1024 \times 1024$ causerebbe immediatamente un \textit{Stack Overflow}), l'algoritmo è stato implementato in modo \textbf{iterativo} avvalendosi di uno \texttt{std::stack} esplicito allocato sull'heap.
-\begin{enumerate}
-    \item Estrae un set di nodi dalla pila e stabilisce l'asse su cui effettuare il taglio (riga o colonna, alternati ad ogni livello).
-    \item Calcola la coordinata mediana per la dimensione scelta.
-    \item Partiziona l'array di nodi in $V_1$ (coordinata minore), $V_2$ (maggiore) e $V_S$ (uguale alla mediana).
-    \item Poiché lo stack funziona con logica LIFO (Last In, First Out) e noi desideriamo che il separatore $V_S$ sia valutato per ultimo (in modo che finisca in fondo alla matrice), l'inserimento nello stack avviene a ritroso: per primo viene impilato $V_S$, poi $V_2$, infine $V_1$ (che si troverà in cima e verrà esaminato subito).
-\end{enumerate}
+  L'algoritmo è stato implementato tramite \textbf{ricorsione classica} come da specifiche, affidandosi al \textit{Divide et Impera}.
+  \begin{enumerate}
+      \item Calcola la coordinata mediana per l'asse di taglio stabilito (riga o colonna, alternati ad ogni livello).
+      \item Partiziona l'array di nodi in $V_1$ (coordinata minore), $V_2$ (maggiore) e $V_S$ (uguale alla mediana).
+      \item Esegue la chiamata ricorsiva su $V_1$ e poi su $V_2$.
+      \item Al termine delle chiamate ricorsive, accoda i nodi del separatore $V_S$ all'ordinamento finale, spingendoli verso il basso nella matrice.
+  \end{enumerate}
 \textbf{Complessità:} 
 \begin{itemize}
     \item \textit{Temporale:} $\mathcal{O}(N^2 \log N)$ per il partizionamento sequenziale. Più efficiente delle omologhe euristiche a grafo (spesso limitate a complessità cubiche $O(N^3)$ se non ottimizzate).
-    \item \textit{Spaziale:} $\mathcal{O}(N^2)$ dominata dall'immagazzinamento delle coordinate e dello stack esplicito.
+    \item \textit{Spaziale:} $\mathcal{O}(N^2)$ dominata dall'immagazzinamento delle coordinate.
     \item \textit{Possibili varianti:} Se il dominio fosse un rettangolo non uniforme (anziché $N \times N$), converrebbe modificare il partizionamento scegliendo sempre l'asse più allungato (invece di alternare rigidamente $X$ e $Y$) per garantire tagli sempre ottimali (\textit{longest-edge bisection}).
 \end{itemize}
+
 
 \subsection{3. Il generatore di matrici sparse: assemblaggio e struttura printata}
 \textbf{Come funziona (Modulo 3):}
@@ -1796,36 +1765,47 @@ Essendo le equazioni riordinate per minimizzare lo spreco computazionale, il vet
 Prima di essere elaborato, $u$ viene ritrasformato secondo la permutazione naturale inversa, così da far coincidere ogni indice lineare alla propria posizione $2D$ originale $(x,y)$.
 Tramite \texttt{matplotlib} viene generato un \textit{color plot} (heatmap). Date le equazioni del sistema, la rappresentazione grafica mostra esplicitamente un nucleo caldo asimmetrico nel vertice inferiore-sinistro (dove è situata la sorgente termica gaussiana) e una sfumatura fredda (blu intenso) procedendo verso i margini della piastra per assecondare la condizione di Dirichlet in cui i bordi si comportano come pozzi di calore a $0^\circ$.
 
-\subsection{5. Mostrare il codice in azione}
-Per dimostrare il flusso all'esame, l'approccio ideale è utilizzare una griglia piccolissima (es. $N=4$):
+\subsection{5. Mostrare il codice in azione all'esame}
+Per dimostrare la correttezza e l'efficienza della pipeline durante l'esame, è raccomandabile procedere in due fasi: una prima fase di verifica e ispezione su una griglia microscopica, seguita da una seconda fase dimostrativa in Python per validare i calcoli matriciali.
+
+\textbf{Fase 1: Ispezione manuale dei file (Griglia N=4)}
+L'approccio ideale è iniziare mostrando la pipeline C++ su una griglia molto piccola (es. $N=4$, totale $16$ nodi interni), in modo che i file di output siano facilmente leggibili.
+
 \begin{enumerate}
-    \item \texttt{./task1 4} (genera $16$ nodi).
-    \item Mostrare rapidamente \texttt{coords.txt}, sottolineando l'identificatore progressivo da $0$ a $15$.
-    \item \texttt{./task2}. Aprendo \texttt{ordering.txt}, evidenziare come i primi nodi stampati non siano più $0,1,2\dots$ ma i nodi d'angolo periferici (che formano il gruppo $V_1$ distaccato), provando materialmente l'avvenuta dissezione.
-    \item \texttt{./task3 4 --reorder}. Mostrare il menu interattivo e l'esportazione pulita in \texttt{A.txt}.
+    \item \textbf{Generazione Griglia e Grafo:}
+    Eseguire il comando:
+    \begin{lstlisting}[style=cpp]
+    ./task1 4
+    \end{lstlisting}
+    Si aprirà rapidamente la cartella \texttt{output/}. Mostrare al docente il file \texttt{coords.txt}, facendo notare che le coordinate $(x,y)$ spaziano correttamente tra $0.2$ e $0.8$ (dato che $h = 1/5 = 0.2$), e sottolineando l'identificatore progressivo da $0$ a $15$ basato sull'ordinamento naturale row-major.
+
+    \item \textbf{Nested Dissection (Riordinamento):}
+    Eseguire il comando:
+    \begin{lstlisting}[style=cpp]
+    ./task2
+    \end{lstlisting}
+    Aprire il file \texttt{ordering.txt}. Evidenziare come i primi nodi stampati non siano più nell'ordine naturale $0, 1, 2, \dots$ ma bensì i nodi situati negli angoli periferici del dominio (ad esempio, il nodo in basso a sinistra). Questo prova materialmente l'avvenuta dissezione geometrica e la costruzione dei blocchi indipendenti $V_1$ e $V_2$.
+
+    \item \textbf{Assemblaggio del Sistema Lineare:}
+    Avviare il terzo modulo attivando esplicitamente il riordinamento:
+    \begin{lstlisting}[style=cpp]
+    ./task3 4 --reorder
+    \end{lstlisting}
+    Mostrare il menu interattivo (ad esempio scegliendo la condizione base di Dirichlet, caso 0). Quindi aprire \texttt{A.txt}. Fare notare come i valori diagonali siano pari a $-4\kappa/h^2 = -4(0.01)/(0.04) = -1$, mentre i valori fuori diagonale siano $+0.25$. La struttura del file (riga, colonna, valore) conferma l'uso del formato COO.
 \end{enumerate}
+
+\textbf{Fase 2: Validazione numerica (Python e Spy Plot)}
+Una volta dimostrato che i moduli C++ comunicano correttamente, passare al Notebook Jupyter (\texttt{solver.ipynb}) o lanciare lo script Python di soluzione.
+\begin{itemize}
+    \item Mostrare lo \textbf{spy plot} della matrice non fattorizzata $-A$. Anche con riordinamento attivo, i punti non nulli sono sparsi.
+    \item Mostrare l'effetto del \textbf{fill-in} ricalcolando la fattorizzazione per $N=32$ prima senza riordinamento (ordinamento naturale), e poi con il file \texttt{ordering.txt} (Nested Dissection). La differenza visiva del fattore $L$ (una massa scura e densa nel primo caso, una struttura a blocchi sparsa nel secondo) costituirà la prova visiva inconfutabile del successo dell'algoritmo di riordinamento implementato.
+    \item Concludere mostrando la \textbf{heatmap} della soluzione finale $u(x,y)$, evidenziando il picco di calore asimmetrico causato dalla sorgente gaussiana $e^{-10(x^2+y^2)}$ vicino all'origine.
+\end{itemize}
 
 \subsection{6. Generazione via Intelligenza Artificiale (Meta-Commento Documentale)}
 In alcune occasioni, il docente ha esplicitamente richiesto di sottoporre un estratto del documento di design a un modello generativo, per testarne la chiarezza: "Se dessi questo documento in pasto a un'IA, produrrebbe codice C++ corretto?".
 L'idea alla base è che il documento non deve limitarsi a descrivere "a grandi linee", bensì fornire le \textbf{specifiche funzionali assolute}: input/output file, invarianti strutturali (come il "non caricare \texttt{connectivity.txt} nel Modulo 2"), le strutture dati (es. lo "Stack Esplicito") e i casi di fallimento o fallback (come la lettura da tastiera del parametro mancante). Grazie all'articolazione quasi pre-codice delle sezioni logiche qui fornite, e all'utilizzo degli pseudocodici nel modulo di \textit{design}, la transcodifica risulta inequivocabile e meccanica.
 
-\subsection{7. Dettagli Implementativi C++ e Scelte Sintattiche}
-Durante la discussione o l'analisi del codice, possono emergere domande specifiche sulle scelte puramente sintattiche adottate in C++. Ecco le principali:
-
-\begin{itemize}
-    \item \textbf{La direttiva \texttt{inline} (es. \texttt{inline int getNodeId(...)})}:
-    Questa direttiva suggerisce al compilatore di espandere il corpo della funzione direttamente nel punto in cui viene chiamata, evitando l'\emph{overhead} (costo computazionale) tipico dell'invocazione di funzione (salvataggio dei registri, salto nello stack, ripristino). Trattandosi di una semplice formula aritmetica $\phi(i,j) = (i-1)N+(j-1)$ richiamata milioni di volte all'interno dei cicli \texttt{for} annidati in \texttt{task1} e \texttt{task3}, renderla \texttt{inline} abbassa significativamente i tempi di esecuzione e permette al compilatore di applicare ottimizzazioni più aggressive (\emph{loop unrolling} e vettorizzazione).
-
-    \item \textbf{Gestione degli input da terminale (\texttt{argc}, \texttt{argv} e \texttt{std::stoi})}:
-    Il passaggio di parametri essenziali come $N$ avviene tramite argomenti da riga di comando. 
-    L'array \texttt{argv} contiene stringhe in formato C (\texttt{char*}). Per convertire la stringa che rappresenta la dimensione della griglia in un vero numero intero su cui fare operazioni aritmetiche, è fondamentale usare la funzione della Standard Library \texttt{std::stoi} (String TO Integer). Al contrario del vecchio \texttt{atoi} ereditato dal C, \texttt{std::stoi} offre sicurezza sui tipi lanciando un'eccezione (\texttt{std::invalid\_argument}) se l'utente fornisce lettere o formati non validi invece di un numero.
-
-    \item \textbf{Il metodo \texttt{.reserve()} sui \texttt{std::vector}}:
-    Nei vari task, spesso allochiamo array dinamici che conterranno migliaia di elementi (es. le coordinate dei nodi o lo stack nel task 2). Utilizzare preventivamente \texttt{nodi.reserve(N*N)} istruisce il vettore ad allocare in blocco tutta la memoria necessaria fin dall'inizio. Questo evita le continue riallocazioni interne (e conseguenti copiature di tutti gli elementi già inseriti) che il vettore sarebbe altrimenti costretto a fare ogni volta che si esaurisce la sua capacità di default durante ripetuti \texttt{push\_back()}, garantendo un inserimento a tempo costante rigoroso $\mathcal{O}(1)$.
-
-    \item \textbf{Scrittura su file: \texttt{\textbackslash n} vs \texttt{std::endl}}:
-    Durante l'esportazione di matrici sparse (\texttt{A.txt}), il codice deve scrivere milioni di righe su disco. L'uso sistematico di \texttt{'\textbackslash n'} anziché \texttt{std::endl} è una scelta mirata alle \emph{performance}: \texttt{std::endl} non si limita ad andare a capo, ma forza ogni volta il \emph{flush} del buffer del sistema operativo sul disco fisico. Questo causerebbe colli di bottiglia catastrofici (I/O bound). Scrivendo \texttt{\textbackslash n}, lasciamo che il sistema operativo decida il momento migliore per riversare i blocchi di dati su disco, riducendo i tempi di I/O di ordini di grandezza.
-\end{itemize}
 
 % ============================================================
 \end{document}
