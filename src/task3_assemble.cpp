@@ -1,29 +1,3 @@
-// ============================================================
-//  task3_assemble.cpp
-//  Modulo 3 — Assemblaggio del sistema lineare Au = b
-//
-//  Equazione del calore 2D stazionaria con differenze finite:
-//      kappa * (u_xx + u_yy) + f(x,y) = 0,  (x,y) in Omega=[0,1]^2
-//      u = 0 sul bordo
-//
-//  Parametri fisici:
-//      kappa = 0.01
-//      f(x,y) = exp(-10*(x^2 + y^2))
-//
-//  Stencil a 5 punti:
-//      A[k,k]   = -4*kappa/h^2   (diagonale)
-//      A[k,k']  = +kappa/h^2     (fuori diagonale, per ogni vicino interno)
-//      b[k]     = -f(x_i, y_j)   (con eventuale correzione Dirichlet, qui nulla)
-//
-//  Uso:
-//      ./task3_assemble <N>
-//      ./task3_assemble <N> --reorder
-//
-//  Output:
-//      output/A.txt   — tripli (i, j, val) per ogni entrata non nulla (simmetrica)
-//      output/b.txt — vettore dei termini noti, uno per riga
-// ============================================================
-
 #include <iostream>
 #include <fstream>
 #include <vector>
@@ -46,16 +20,7 @@ inline double f_sorgente(double x, double y) {
     return exp(-10.0 * (x * x + y * y));
 }
 
-// ============================================================
-//  Parte Opzionale — Condizioni al bordo non omogenee u0(x,y)
-//
-//  Scelta 0: u0 = 0              (omogenee, default)
-//  Scelta 1: u0 = 10.0           (costante — sanity check)
-//  Scelta 2: u0 = x              (gradiente lineare)
-//  Scelta 3: u0 = sin(pi*x)      (sinusoidale continua)
-//  Scelta 4: u0 = x^2 - y^2     (armonica, Laplaciano = 0)
-//  Scelta 5: u0 = 1 se y=1, 0   (shock termico bordo superiore)
-// ============================================================
+
 double get_u0(double x, double y, int scelta) {
     switch (scelta) {
         case 0: return 0.0;
@@ -90,16 +55,16 @@ int main(int argc, char* argv[]) {
     if (argc < 2 || argc > 4) {
         cerr << "\n  Assembla il sistema lineare Au = b per l'equazione del calore 2D." << endl;
         cerr << "\n  Uso:" << endl;
-        cerr << "    " << argv[0] << " <N> [--reorder]" << endl;
+        cerr << "    " << argv[0] << " <N> [-r]" << endl;
         cerr << "\n  Argomenti:" << endl;
         cerr << "    N           Dimensione della griglia: genera N^2 incognite interne" << endl;
-        cerr << "    --reorder   Applica l'ordinamento Nested Dissection (richiede ordering.txt)" << endl;
+        cerr << "    -r          Applica l'ordinamento Nested Dissection (richiede ordering.txt)" << endl;
         cerr << "                Se omesso, viene usato l'ordinamento naturale (lessicografico)" << endl;
         cerr << "\n  Prerequisiti:" << endl;
         cerr << "    task1 N           deve essere stato eseguito per produrre coords.txt" << endl;
         cerr << "    task2 [--nd]      deve essere stato eseguito per produrre ordering.txt" << endl;
         cerr << "\n  Esempio:" << endl;
-        cerr << "    " << argv[0] << " 64 --reorder" << endl << endl;
+        cerr << "    " << argv[0] << " 64 -r" << endl << endl;
         return 1;
     }
 
@@ -114,7 +79,7 @@ int main(int argc, char* argv[]) {
     
     for (int i = 2; i < argc; ++i) {
         string flag = argv[i];
-        if (flag == "--reorder") {
+        if (flag == "-r") {
             usa_reorder = true;
         } else {
             try {
@@ -152,8 +117,6 @@ int main(int argc, char* argv[]) {
     }
     
     cout << "\n  Condizioni al bordo di Dirichlet: [" << scelta_bordo << "] " << nomi_bordo[scelta_bordo] << endl;
-
-    mkdir(OUTPUT_DIR.c_str(), 0755);
 
     // --------------------------------------------------------
     // 2. Lettura di coords.txt — coordinate dei nodi interni
@@ -197,7 +160,7 @@ int main(int argc, char* argv[]) {
     file_coords.close();
 
     // --------------------------------------------------------
-    // 3. Lettura di ordering.txt (solo se --reorder)
+    // 3. Lettura di ordering.txt (solo se -r)
     //    Formato: new_id old_id
     //    inv_perm[old_id] = new_id  (da ordinamento naturale a riordinato)
     // --------------------------------------------------------
@@ -311,11 +274,11 @@ int main(int argc, char* argv[]) {
     file_A.close();
 
     // --------------------------------------------------------
-    // 6. Scrittura di b.txt — un valore per riga
+    // 6. Scrittura di rhs.txt — un valore per riga
     // --------------------------------------------------------
-    ofstream file_b(OUTPUT_DIR + "b.txt");
+    ofstream file_b(OUTPUT_DIR + "rhs.txt");
     if (!file_b.is_open()) {
-        cerr << "Errore: impossibile creare " << OUTPUT_DIR << "b.txt" << endl;
+        cerr << "Errore: impossibile creare " << OUTPUT_DIR << "rhs.txt" << endl;
         return 1;
     }
     file_b << fixed << setprecision(10);
@@ -337,7 +300,7 @@ int main(int argc, char* argv[]) {
     cout << "    Condizione al bordo   :  [" << scelta_bordo << "] " << nomi_bordo[scelta_bordo] << endl;
     cout << "    Entrate scritte (A)   :  " << triplets.size() << endl;
     cout << "  " << string(52, '-') << endl;
-    cout << "  File prodotti: A.txt, b.txt  ->  cartella output/" << endl << endl;
+    cout << "  File prodotti: A.txt, rhs.txt  ->  cartella output/" << endl << endl;
 
     return 0;
 }

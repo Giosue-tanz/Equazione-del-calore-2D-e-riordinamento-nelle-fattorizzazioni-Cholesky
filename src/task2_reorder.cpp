@@ -1,71 +1,34 @@
-// ============================================================
-//  task2_reorder.cpp
-//  Modulo 2 — Nested Dissection GEOMETRICA
-//
-//  Calcola una permutazione dei nodi della griglia N×N tramite
-//  l'algoritmo di nested dissection BASATO ESCLUSIVAMENTE sulle
-//  coordinate spaziali (i, j) lette da coords.txt.
-//
-//  APPROCCIO GEOMETRICO (non su grafo):
-//  ─────────────────────────────────────
-//  Per griglie cartesiane regolari il separatore geometrico ottimale
-//  coincide esattamente con il separatore topologico: la riga (o colonna)
-//  mediana divide il grafo di adiacenza in due componenti bilanciate senza
-//  archi tra loro, senza bisogno di esplorare la lista di adiacenza.
-//
-//  Vantaggi:
-//    1. Non richiede la costruzione/esplorazione del grafo  → O(N²logN)
-//    2. Accesso sequenziale alle coordinate                 → cache-friendly
-//    3. Implementazione O(N²logN) deterministica e ottimale per griglie
-//    4. Separatore garantito bilanciato (N/2 nodi per lato)
-//
-//  Algoritmo (ricorsivo classico):
-//    • Inizia con tutti i nodi, asse di taglio = X (i)
-//    • Calcola mid = (min_val + max_val) / 2 sull'asse corrente
-//    • Partiziona: V1 (coord < mid), V2 (coord > mid), VS (coord = mid)
-//    • Richiama ricorsivamente la funzione su V1 e V2 (alternando asse X/Y)
-//    • Ordine finale: V1, poi V2, infine VS (separatore aggiunto per ultimo)
-//
-//  Input:  output/coords.txt   (prodotto da task1_grid)
-//  Output: output/ordering.txt (una riga: "new_id old_id")
-//
-//  Uso: ./task2_reorder
-// ============================================================
-
 #include <iostream>
 #include <fstream>
 #include <vector>
 #include <algorithm>
 #include <string>
+#include <limits>
 using namespace std;
 
 // Cartella di output condivisa con gli altri task
 static const string OUTPUT_DIR = "output/";
 
-// ============================================================
-//  Struttura nodo: mantiene sia gli indici logici (i, j) che
-//  le coordinate fisiche (x, y). L'algoritmo geometrico usa
-//  gli indici interi (i, j) per il taglio mediano, che sono
-//  più robusti di confronti in floating-point.
-// ============================================================
+
+
 struct Node {
     int id;  // identificatore naturale φ(i,j) = (i-1)*N + (j-1)
     int i;   // indice di riga   (1 ≤ i ≤ N)
     int j;   // indice di colonna (1 ≤ j ≤ N)
-    double x; // coordinata fisica x = i/(N+1)
-    double y; // coordinata fisica y = j/(N+1)
 };
+
+// semplicemente perche usare std::pair<int,int> sarebbe meno leggibile
 
 // ============================================================
 //  nested_dissection_geometrica
-//  ────────────────────────────
-//  Versione RICORSIVA classica.
+//  ===========================================================
 //  Applica Divide et Impera partizionando geometricamente i nodi.
 //  Complessità: O(N² log N) in tempo, profondità albero O(log N).
 // ============================================================
-void nested_dissection_geometrica(const vector<Node>& nodi_iniziali,
-                                   int axis_iniziale,
-                                   vector<int>& ordering)
+
+// Oss:  porzione di griglia corrente da dividere, selettore per l'asse di taglio (0 = orizzontale/righe, 1 = verticale/colonne), lista globale condivisa (passata con & per poterla modificare senza crearne permutazione finale dei nodi che stiamo costruendo in post-ordine.
+
+void nested_dissection_geometrica(const vector<Node>& nodi_iniziali, int axis_iniziale, vector<int>& ordering)
 {
     // ── Caso base: nessun nodo ──────────────────────────────────────────
     if (nodi_iniziali.empty()) return;
@@ -77,7 +40,7 @@ void nested_dissection_geometrica(const vector<Node>& nodi_iniziali,
     }
 
     // ── Calcolo separatore geometrico ───────────────────────────────────
-    int min_val = (axis_iniziale == 0) ? nodi_iniziali[0].i : nodi_iniziali[0].j;
+    int min_val = (axis_iniziale == 0) ? nodi_iniziali[0].i : nodi_iniziali[0].j; //op.ternario 
     int max_val = min_val;
     for (const auto& node : nodi_iniziali) {
         int val = (axis_iniziale == 0) ? node.i : node.j;
@@ -89,11 +52,11 @@ void nested_dissection_geometrica(const vector<Node>& nodi_iniziali,
 
     vector<Node> V1, V2, VS;
     V1.reserve(nodi_iniziali.size());
-    V2.reserve(nodi_iniziali.size());
+    V2.reserve(nodi_iniziali.size()); // r evita riallocazioni multiple
     VS.reserve(nodi_iniziali.size());
 
-    for (const auto& node : nodi_iniziali) {
-        int val = (axis_iniziale == 0) ? node.i : node.j;
+    for (const auto& node : nodi_iniziali) { // nuova nomenclatura 
+        int val = (axis_iniziale == 0) ? node.i : node.j; //op.ternario
         if      (val < mid_val) V1.push_back(node);
         else if (val > mid_val) V2.push_back(node);
         else                    VS.push_back(node);
@@ -113,9 +76,7 @@ void nested_dissection_geometrica(const vector<Node>& nodi_iniziali,
     }
 }
 
-// ============================================================
-//  main
-// ============================================================
+
 int main() {
 
     // ── 1. Lettura di coords.txt ────────────────────────────────────────────
@@ -123,6 +84,7 @@ int main() {
     // Il file connectivity.txt (grafo di adiacenza) NON viene letto:
     // per griglie regolari la struttura topologica è interamente codificata
     // dagli indici (i, j) e il separatore geometrico è anche separatore del grafo.
+
     ifstream coords_file(OUTPUT_DIR + "coords.txt");
     if (!coords_file.is_open()) {
         cerr << "Errore: impossibile aprire " << OUTPUT_DIR << "coords.txt" << endl;
@@ -132,9 +94,10 @@ int main() {
 
     vector<Node> nodes;
     int n, i, j;
-    double x, y;
-    while (coords_file >> n >> i >> j >> x >> y) {
-        nodes.push_back({n, i, j, x, y});
+    // Leggiamo solo id, i, j. Le coordinate x e y vengono ignorate per performance.
+    while (coords_file >> n >> i >> j) {
+        nodes.push_back({n, i, j});
+        coords_file.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
     }
     coords_file.close();
 

@@ -15,19 +15,19 @@ L'obiettivo principale è analizzare l'efficacia del riordinamento dei nodi del 
 ---
 
 ## 2. Architettura del Software e Moduli Principali
-Il software adotta un'architettura modulare incentrata sul concetto di un risolutore generale denominato `HeatEquationSolver`. Di seguito vengono identificati i principali moduli che comporranno il sistema e i rispettivi compiti:
+Il software adotta un'architettura modulare incentrata sul concetto di un risolutore generale denominato `HES--HeatEquationSolver`. L'architettura prevede la divisione del problema in quattro moduli principali, di cui tre sviluppati in C++ e uno in Python, che comunicano in modo sequenziale scambiandosi file di testo.
 
-* **Modulo 1: Generazione della Griglia e Grafo di Adiacenza (C++)**
-  * **Compito:** Riceve in input il parametro di discretizzazione $N$, genera i punti interni e calcola le relazioni di adiacenza orizzontale e verticale. Esporta i dati nei file di testo dedicati.
-  
-* **Modulo 2: Calcolo dell'Ordinamento Geometrico (C++)**
-  * **Compito:** Implementa l'algoritmo di partizionamento ricorsivo dei nodi basato sulle coordinate spaziali, alternando la separazione lungo gli assi $x$ e $y$ (*nested dissection*) per generare un ordinamento ottimizzato.
-  
-* **Modulo 3: Costruzione del Sistema Lineare ed Esportazione (C++)**
-  * **Compito:** Applica lo schema di discretizzazione dell'equazione differenziale, gestisce la sorgente di calore e incorpora le condizioni al contorno, assemblando la matrice sparsa e il vettore dei termini noti secondo l'ordinamento scelto.
-  
-* **Modulo 4: Risoluzione e Analisi Numerica (Python / Jupyter Notebook)**
-  * **Compito:** Carica i file della matrice e del vettore dei termini noti, converte la struttura nel formato sparso CSC e calcola la fattorizzazione di Cholesky.
+**Modulo 1: Generazione della Griglia e Grafo di Adiacenza (`task1_grid.cpp`)**
+Questo primo modulo funge da punto di ingresso. Riceve in input da riga di comando il parametro di discretizzazione $N$ e si occupa di generare la griglia di nodi fisici interni al dominio spaziale e il relativo grafo di adiacenza. Sfruttando liste di adiacenza implementate tramite `std::vector`, il modulo mappa la struttura e salva le informazioni in output sui file `coords.txt` e `connectivity.txt`. L'intera generazione richiede tempo e spazio lineare $\mathcal{O}(N^2)$ rispetto al numero totale dei nodi interni.
+
+**Modulo 2: Calcolo dell'Ordinamento Geometrico (`task2_reorder.cpp`)**
+È il nucleo algoritmico del software. Riceve in input il file delle coordinate `coords.txt` (ignorando appositamente il grafo di adiacenza per ottimizzare gli accessi in memoria) per calcolare una permutazione ottimizzata dei nodi. L'approccio si basa sulla *nested dissection geometrica*, un algoritmo divide-et-impera che partiziona il dominio separando i nodi rispetto al piano mediano, alternando gli assi $x$ e $y$. Utilizza strutture dati leggere (come vettori e struct ad hoc) e restituisce in output il file `ordering.txt`. L'algoritmo ha una complessità temporale attesa di $\mathcal{O}(N^2 \log N)$ e un'occupazione spaziale pari a $\mathcal{O}(N^2)$.
+
+**Modulo 3: Costruzione del Sistema Lineare ed Esportazione (`task3_assemble.cpp`)**
+Questo modulo applica lo schema di discretizzazione tramite stencil a 5 punti per trasformare il problema differenziale in un sistema algebrico. Riceve in input $N$, le coordinate, l'ordinamento (attivabile tramite il flag opzionale `-r`) e gestisce le eventuali condizioni di Dirichlet al contorno e la sorgente di calore. Sfruttando array di permutazione inversa, assembla la matrice sparsa simmetrica in una lista di triplette e calcola il vettore dei termini noti. Genera in output i file `A.txt` e `rhs.txt` operando nel rispetto della complessità asintotica ottimale $\mathcal{O}(N^2)$ sia in tempo che in spazio.
+
+**Modulo 4: Risoluzione e Analisi Numerica (`solver.ipynb`)**
+L'ultimo modulo è sviluppato interamente in Python tramite Jupyter Notebook e unifica la risoluzione matematica all'analisi sperimentale. Legge i file `A.txt` e `rhs.txt` per vari $N$, assembla la matrice nel formato compresso CSC di SciPy e calcola la soluzione esatta del sistema lineare servendosi della fattorizzazione di Cholesky. Oltre alla computazione vera e propria, questo ambiente genera automaticamente i grafici comparativi (come gli spy plot per la struttura della matrice) e la visualizzazione delle temperature. In termini di efficienza, l'ordinamento ottimizzato riduce drasticamente l'occupazione spaziale del fill-in da $\mathcal{O}(N^3)$ a $\mathcal{O}(N^2 \log N)$.
 
 ---
 
@@ -36,8 +36,8 @@ I moduli interagiscono in modo sequenziale attraverso file di testo intermedi ch
 
 1. Il **Modulo 1** produce i file `coords.txt` e `connectivity.txt`.
 2. Il **Modulo 2** legge tali file e genera il file `ordering.txt` contenente la sequenza riordinata dei nodi.
-3. Il **Modulo 3** utilizza sia le informazioni strutturali del grafo sia l'ordinamento per calcolare e produrre i file finali del sistema lineare, ossia `A.txt` e `b.txt`.
-4. Il **Modulo 4** acquisisce `A.txt` e `b.txt` per eseguire la computazione finale e l'analisi sperimentale.
+3. Il **Modulo 3** utilizza sia le informazioni strutturali del grafo sia l'ordinamento per calcolare e produrre i file finali del sistema lineare, ossia `A.txt` e `rhs.txt`.
+4. Il **Modulo 4** acquisisce `A.txt` e `rhs.txt` per eseguire la computazione finale e l'analisi sperimentale.
 
 ---
 

@@ -1,22 +1,3 @@
-// ============================================================
-//  task1_grid.cpp
-//  Modulo 1 — Generazione della griglia e del grafo di adiacenza
-//
-//  Genera la struttura geometrica del dominio discretizzato e il
-//  relativo grafo di adiacenza della griglia N×N.
-//
-//  Parametri geometrici:
-//    - Dominio: [0,1]^2
-//    - Passo: h = 1/(N+1)
-//    - Nodi interni: N^2,  ID φ(i,j) = (i-1)*N + (j-1)
-//
-//  Output (in output/):
-//    - coords.txt       — una riga per nodo: "id i j x y"
-//    - connectivity.txt — una riga per arco: "u v" con u < v
-//
-//  Uso: ./task1_grid <N>
-// ============================================================
-
 #include <iostream>
 #include <fstream>
 #include <vector>
@@ -37,6 +18,7 @@ inline int getNodeId(int i, int j, int N) {
 
 int main(int argc, char* argv[]) {
     int N = 0;
+
     if (argc >= 2) {
         try {
             N = stoi(argv[1]);
@@ -64,9 +46,6 @@ int main(int argc, char* argv[]) {
     }
 
     int num_nodes = N * N;
-
-    // Crea la directory output/ se non esiste
-    mkdir(OUTPUT_DIR.c_str(), 0755);
 
     // ── Generazione Nodi (coords.txt) ────────────────────────────────────────
     ofstream coords_file(OUTPUT_DIR + "coords.txt");
@@ -122,7 +101,7 @@ int main(int argc, char* argv[]) {
 
     int edge_id = 0;
     for (int u = 0; u < num_nodes; ++u) {
-        for (int v : adj_list[u]) {
+        for (int v : adj_list[u]) { //Per ogni vicino v che trovo all'interno della lista dei vicini di u... 
             if (u < v) {
                 conn_file << edge_id++ << " " << u << " " << v << "\n";
             }

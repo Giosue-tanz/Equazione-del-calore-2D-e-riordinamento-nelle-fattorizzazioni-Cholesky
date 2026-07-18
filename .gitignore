@@ -59,15 +59,15 @@ compile_commands.json
 *.swp
 
 # LaTeX auxiliary files
-docs/*.aux
-docs/*.log
-docs/*.toc
-docs/*.out
-docs/*.fls
-docs/*.fdb_latexmk
-docs/*.synctex.gz
-docs/*.blg
-docs/*.bbl
+**/*.aux
+**/*.log
+**/*.toc
+**/*.out
+**/*.fls
+**/*.fdb_latexmk
+**/*.synctex.gz
+**/*.blg
+**/*.bbl
 
 
 # vcpkg
@@ -79,3 +79,12 @@ vcpkg_installed/
 # test output & cache
 Testing/
 .cache/
+output/
+.ipynb_checkpoints/
+*.ipynb
+*.pyc
+__pycache__/
+task1
+task2
+task3
+docs/teoria e approfondimenti/
